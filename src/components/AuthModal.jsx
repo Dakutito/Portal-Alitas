@@ -75,8 +75,6 @@ export default function AuthModal({ tab: initialTab, onClose }) {
     } catch (e) {
       if (e.message === 'SUPABASE_TIMEOUT') {
         console.error('Supabase timeout. Project might be paused.')
-        localStorage.clear()
-        sessionStorage.clear()
         setErr('La conexión tardó demasiado. Si el problema persiste, es posible que tu proyecto en Supabase esté **Pausado**. Por favor, revisa tu panel de Supabase.')
       } else {
         console.error('Unexpected Login catch:', e)

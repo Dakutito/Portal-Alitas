@@ -15,11 +15,16 @@ export default function Navbar() {
   const isAdmin = profile?.rol === 'admin'
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    logout()
-    showToast('info', '👋', 'Sesión cerrada', '¡Hasta pronto!')
-    navigate('/')
-    setDrawerOpen(false)
+    try {
+      logout() // Clear local state immediately for better UX
+      await supabase.auth.signOut()
+      showToast('info', '👋', 'Sesión cerrada', '¡Hasta pronto!')
+    } catch (e) {
+      console.error('Logout error:', e)
+    } finally {
+      navigate('/')
+      setDrawerOpen(false)
+    }
   }
 
   const openAuth = (tab = 'login') => {

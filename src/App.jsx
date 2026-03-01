@@ -11,8 +11,13 @@ import Admin from './pages/Admin'
 
 function ProtectedRoute({ children, adminOnly }) {
   const { user, profile } = useStore()
+
+  // If we have no user in the (potentially persisted) store, redirect.
+  // With Zustand persist, 'user' will be populated immediately if it was there before.
   if (!user) return <Navigate to="/" replace />
+
   if (adminOnly && profile?.rol !== 'admin') return <Navigate to="/" replace />
+
   return children
 }
 
