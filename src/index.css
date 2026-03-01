@@ -223,6 +223,10 @@ button, input, select, textarea { font-family: inherit }
   .admin-sidebar { position:static; height:auto }
   .admin-menu { flex-direction:row; flex-wrap:wrap; gap:.35rem }
   .admin-menu-item { width:auto }
+  .hide-mobile { display: none !important; }
+}
+@media(min-width:901px) {
+  .hide-desktop { display: none !important; }
 }
 @media(max-width:640px) {
   .form-row { grid-template-columns:1fr }

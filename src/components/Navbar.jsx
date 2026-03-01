@@ -53,7 +53,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop links */}
-        <div style={{ display: 'flex', gap: '.15rem', flex: 1, justifyContent: 'center' }} className="nav-links-desktop">
+        <div style={{ display: 'flex', gap: '.15rem', flex: 1, justifyContent: 'center' }} className="nav-links-desktop hide-mobile">
           <NavBtn onClick={() => navigate('/')} active={location.pathname === '/'}>Home</NavBtn>
           {user && !isAdmin && <NavBtn onClick={() => navigate('/order')} active={location.pathname === '/order'}>Menú</NavBtn>}
           {user && !isAdmin && <NavBtn onClick={() => navigate('/status')} active={location.pathname === '/status'}>Mis Pedidos</NavBtn>}
@@ -63,7 +63,7 @@ export default function Navbar() {
         {/* Right section */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexShrink: 0 }}>
           {!user && (
-            <button className="btn-nav-cta" onClick={() => openAuth('login')} style={{
+            <button className="btn-nav-cta hide-mobile" onClick={() => openAuth('login')} style={{
               background: 'var(--red)', color: '#fff', border: 'none', padding: '.45rem 1.1rem',
               borderRadius: 8, fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', whiteSpace: 'nowrap'
             }}>Iniciar Sesión</button>
@@ -80,14 +80,14 @@ export default function Navbar() {
             </div>
           )}
           {/* Hamburger */}
-          <button onClick={() => setDrawerOpen(true)} style={{
+          <button onClick={() => setDrawerOpen(true)} className="hide-desktop" style={{
             display: 'flex', background: 'none', border: 'none', color: 'var(--white)', cursor: 'pointer',
             padding: '.25rem', width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
             flexDirection: 'column', gap: 5, transition: 'background .2s'
           }}>
-            <span style={{ display: 'block', width: 20, height: 2, background: 'var(--white)', borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 20, height: 2, background: 'var(--white)', borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 20, height: 2, background: 'var(--white)', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
+            <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
           </button>
         </div>
       </nav>

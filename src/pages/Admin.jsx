@@ -24,11 +24,43 @@ export default function Admin() {
   const [confirm, setConfirm] = useState(null)
 
   useEffect(() => {
-    if (!user || profile?.rol !== 'admin') { navigate('/'); return }
-    loadBadge()
-    const ch = supabase.channel('admin-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => loadBadge()).subscribe()
-    return () => supabase.removeChannel(ch)
+    const checkAuth = async () => {
+      // If we don't have a user, it's possible we are hydrating
+      if (!user) return
+
+      // If we have a user but no profile yet, wait for App.jsx to fetch it
+      if (!profile) return
+
+      // If we have a profile and it's not admin, redirect
+      if (profile.rol !== 'admin') {
+        navigate('/')
+        return
+      }
+
+      loadBadge()
+      const ch = supabase.channel('admin-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => loadBadge())
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(ch)
+      }
+    }
+
+    const cleanup = checkAuth()
+    return () => { if (cleanup && typeof cleanup === 'function') cleanup() }
   }, [user, profile])
+
+  if (!user || !profile) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', color: 'var(--gray)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔒</div>
+          <p>Verificando credenciales...</p>
+        </div>
+      </div>
+    )
+  }
 
   const loadBadge = async () => {
     const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true }).in('estado', ['pendiente', 'preparacion', 'listo'])
