@@ -31,7 +31,7 @@ export default function AuthModal({ tab: initialTab, onClose }) {
       console.log('Attempting signInWithPassword...')
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SUPABASE_TIMEOUT')), 12000)
+        setTimeout(() => reject(new Error('SUPABASE_TIMEOUT')), 20000)
       )
 
       const { data, error } = await Promise.race([
@@ -74,8 +74,8 @@ export default function AuthModal({ tab: initialTab, onClose }) {
       }
     } catch (e) {
       if (e.message === 'SUPABASE_TIMEOUT') {
-        console.error('Supabase timeout. Project might be paused.')
-        setErr('La conexión tardó demasiado. Si el problema persiste, es posible que tu proyecto en Supabase esté **Pausado**. Por favor, revisa tu panel de Supabase.')
+        console.error('Supabase timeout. Project might be slow or paused.')
+        setErr('La conexión tardó mucho tiempo (20s). Si esto sigue pasando, revisa tu panel de Supabase para ver si el proyecto está activo.')
       } else {
         console.error('Unexpected Login catch:', e)
         setErr('Error de conexión o de red. Intenta de nuevo.')
