@@ -23,10 +23,19 @@ export default function Home() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    supabase.from('combos').select('*').then(({ data }) => setCombos(data || []))
-    supabase.from('oferta').select('*').order('id', { ascending: false }).limit(1).then(({ data }) => {
-      if (data && data[0] && data[0].activa) setOferta(data[0])
-    })
+    // Fetch combos
+    supabase.from('combos').select('*')
+      .then(({ data, error }) => {
+        if (error) console.error("Home: Error fetching combos:", error)
+        else setCombos(data || [])
+      })
+
+    // Fetch active offer
+    supabase.from('oferta').select('*').order('id', { ascending: false }).limit(1)
+      .then(({ data, error }) => {
+        if (error) console.error("Home: Error fetching offer:", error)
+        else if (data && data[0] && data[0].activa) setOferta(data[0])
+      })
   }, [])
 
   useEffect(() => {

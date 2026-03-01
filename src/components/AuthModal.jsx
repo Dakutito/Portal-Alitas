@@ -50,23 +50,21 @@ export default function AuthModal({ tab: initialTab, onClose }) {
       }
 
       if (data?.user) {
-        console.log('Login success, fetching profile...')
-        let { data: prof, error: profErr } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle()
+        // Fetch profile
+        let { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle()
 
-        if (!prof && !profErr) {
-          console.log('Profile missing, creating fallback...')
-          const { data: newProf, error: upError } = await supabase.from('profiles').upsert({
+        if (!prof) {
+          // Create fallback profile if missing
+          const { data: newProf } = await supabase.from('profiles').upsert({
             id: data.user.id,
             nombre: data.user.user_metadata?.nombre || (isAdminEmail ? 'Admin' : 'Usuario'),
             email: data.user.email,
             rol: isAdminEmail ? 'admin' : 'user'
           }).select().maybeSingle()
-          if (upError) console.error('Profile Upsert Error:', upError)
           prof = newProf
         }
 
         const finalProfile = prof || { id: data.user.id, nombre: 'Usuario', email: data.user.email, rol: isAdminEmail ? 'admin' : 'user' }
-        console.log('Final Profile:', finalProfile)
         setUser(data.user); setProfile(finalProfile)
         showToast('success', '🎉', '¡Bienvenido!', finalProfile.nombre)
         onClose()

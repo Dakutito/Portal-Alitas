@@ -81,7 +81,7 @@ export default function Navbar() {
           )}
           {/* Hamburger */}
           <button onClick={() => setDrawerOpen(true)} className="hide-desktop" style={{
-            display: 'flex', background: 'none', border: 'none', color: 'var(--white)', cursor: 'pointer',
+            background: 'none', border: 'none', color: 'var(--white)', cursor: 'pointer',
             padding: '.25rem', width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
             flexDirection: 'column', gap: 5, transition: 'background .2s'
           }}>
