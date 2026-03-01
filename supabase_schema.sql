@@ -66,6 +66,30 @@ create table public.pedidos (
   direccion text default '',
   mensaje text default '',
   estado text not null default 'pendiente',
+  arroz jsonb default '{}',
+  adicional jsonb default '{"arroz": 0, "bebidas": 0, "items": []}',
+  es_extra boolean default false,
+  tipo_extra text default null,
+  modificado boolean default false,
+  ultima_mod timestamptz default now(),
+  created_at timestamptz default now()
+);
+
+create table public.pedido_salsas (
+  id serial primary key,
+  pedido_id int references public.pedidos(id) on delete cascade,
+  tipo_salsa text not null,
+  cantidad int not null,
+  created_at timestamptz default now()
+);
+
+create table public.pedido_extras (
+  id serial primary key,
+  pedido_id int references public.pedidos(id) on delete cascade,
+  nombre text not null,
+  cantidad int not null,
+  precio numeric(8,2) not null,
+  tipo text not null,
   created_at timestamptz default now()
 );
 
@@ -94,8 +118,12 @@ alter table public.combos disable row level security;
 alter table public.bebidas disable row level security;
 alter table public.tipos_arroz disable row level security;
 alter table public.pedidos disable row level security;
+alter table public.pedido_salsas disable row level security;
+alter table public.pedido_extras disable row level security;
 alter table public.oferta disable row level security;
 alter table public.inventario disable row level security;
 
 -- 4. REALTIME
 alter publication supabase_realtime add table public.pedidos;
+alter publication supabase_realtime add table public.pedido_salsas;
+alter publication supabase_realtime add table public.pedido_extras;

@@ -192,12 +192,21 @@ function TabCombos({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const save = async () => {
     if (!form.nombre || !form.precio || !form.alitas) { showToast('error', '⚠️', 'Error', 'Completa todos los campos.'); return }
-    if (form.id) {
-      await supabase.from('combos').update({ nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion }).eq('id', form.id)
-    } else {
-      await supabase.from('combos').insert({ nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion, estado: 'disponible', es_jueves: false, emoji: '🍗' })
+    try {
+      if (form.id) {
+        const { error } = await supabase.from('combos').update({ nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion }).eq('id', form.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('combos').insert({ nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion, estado: 'disponible', es_jueves: false, emoji: '🍗' })
+        if (error) throw error
+      }
+      setForm({ id: '', nombre: '', precio: '', alitas: '', descripcion: '' })
+      await load()
+      showToast('success', '✅', 'Combo guardado', '')
+    } catch (err) {
+      console.error("Error saving combo:", err)
+      showToast('error', '⚠️', 'Error al guardar', err.message)
     }
-    setForm({ id: '', nombre: '', precio: '', alitas: '', descripcion: '' }); load(); showToast('success', '✅', 'Combo guardado', '')
   }
   const toggleAgotado = async (c) => { await supabase.from('combos').update({ estado: c.estado === 'agotado' ? 'disponible' : 'agotado' }).eq('id', c.id); load() }
   const del = (id) => confirm({ msg: '¿Eliminar este combo?', onConfirm: async () => { await supabase.from('combos').delete().eq('id', id); load(); showToast('success', '🗑', 'Eliminado', '') } })
@@ -246,10 +255,22 @@ function TabBebidas({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const save = async () => {
     if (!form.nombre || !form.precio) { showToast('error', '⚠️', 'Error', 'Completa nombre y precio.'); return }
-    const d = { nombre: form.nombre, precio: Number(form.precio), tipo: form.tipo, emoji: form.emoji || '🥤' }
-    if (form.id) { await supabase.from('bebidas').update(d).eq('id', form.id) }
-    else { await supabase.from('bebidas').insert({ ...d, activa: true }) }
-    setForm({ id: '', nombre: '', precio: '', tipo: 'normal', emoji: '' }); load(); showToast('success', '✅', 'Bebida guardada', '')
+    try {
+      const d = { nombre: form.nombre, precio: Number(form.precio), tipo: form.tipo, emoji: form.emoji || '🥤' }
+      if (form.id) {
+        const { error } = await supabase.from('bebidas').update(d).eq('id', form.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('bebidas').insert({ ...d, activa: true })
+        if (error) throw error
+      }
+      setForm({ id: '', nombre: '', precio: '', tipo: 'normal', emoji: '' })
+      await load()
+      showToast('success', '✅', 'Bebida guardada', '')
+    } catch (err) {
+      console.error("Error saving bebida:", err)
+      showToast('error', '⚠️', 'Error al guardar', err.message)
+    }
   }
   const toggle = async (b) => { await supabase.from('bebidas').update({ activa: !b.activa }).eq('id', b.id); load() }
   const del = (id) => confirm({ msg: '¿Eliminar esta bebida?', onConfirm: async () => { await supabase.from('bebidas').delete().eq('id', id); load() } })
@@ -303,10 +324,22 @@ function TabArroz({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const save = async () => {
     if (!form.nombre) { showToast('error', '⚠️', 'Error', 'Ingresa el nombre.'); return }
-    const d = { nombre: form.nombre, emoji: form.emoji || '🍚', precio: Number(form.precio) || 1 }
-    if (form.id) { await supabase.from('tipos_arroz').update(d).eq('id', form.id) }
-    else { await supabase.from('tipos_arroz').insert({ ...d, activo: true }) }
-    setForm({ id: '', nombre: '', emoji: '', precio: '1.00' }); load(); showToast('success', '✅', 'Tipo de arroz guardado', '')
+    try {
+      const d = { nombre: form.nombre, emoji: form.emoji || '🍚', precio: Number(form.precio) || 1 }
+      if (form.id) {
+        const { error } = await supabase.from('tipos_arroz').update(d).eq('id', form.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('tipos_arroz').insert({ ...d, activo: true })
+        if (error) throw error
+      }
+      setForm({ id: '', nombre: '', emoji: '', precio: '1.00' })
+      await load()
+      showToast('success', '✅', 'Tipo de arroz guardado', '')
+    } catch (err) {
+      console.error("Error saving arroz:", err)
+      showToast('error', '⚠️', 'Error al guardar', err.message)
+    }
   }
   const toggle = async (t) => { await supabase.from('tipos_arroz').update({ activo: !t.activo }).eq('id', t.id); load() }
   const del = (id) => confirm({ msg: '¿Eliminar este tipo de arroz?', onConfirm: async () => { await supabase.from('tipos_arroz').delete().eq('id', id); load() } })
@@ -354,10 +387,17 @@ function TabOferta({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const crear = async () => {
     if (!form.titulo || !form.descripcion || !form.precio || !form.alitas) { showToast('error', '⚠️', 'Error', 'Completa todos los campos.'); return }
-    const fecha_fin = new Date(Date.now() + Number(form.horas) * 3600000).toISOString()
-    await supabase.from('oferta').insert({ titulo: form.titulo, descripcion: form.descripcion, precio: Number(form.precio), alitas: Number(form.alitas), emoji: form.emoji || '🔥', fecha_fin, activa: true })
-    setForm({ titulo: '', descripcion: '', precio: '', alitas: '', emoji: '🔥', horas: '24' }); load()
-    showToast('success', '⚡', '¡Oferta publicada!', '')
+    try {
+      const fecha_fin = new Date(Date.now() + Number(form.horas) * 3600000).toISOString()
+      const { error } = await supabase.from('oferta').insert({ titulo: form.titulo, descripcion: form.descripcion, precio: Number(form.precio), alitas: Number(form.alitas), emoji: form.emoji || '🔥', fecha_fin, activa: true })
+      if (error) throw error
+      setForm({ titulo: '', descripcion: '', precio: '', alitas: '', emoji: '🔥', horas: '24' })
+      await load()
+      showToast('success', '⚡', '¡Oferta publicada!', '')
+    } catch (err) {
+      console.error("Error creating oferta:", err)
+      showToast('error', '⚠️', 'Error al publicar', err.message)
+    }
   }
   const toggleEstado = async () => { await supabase.from('oferta').update({ activa: !oferta.activa }).eq('id', oferta.id); load() }
   const eliminar = () => confirm({ msg: '¿Eliminar la oferta especial?', onConfirm: async () => { await supabase.from('oferta').delete().eq('id', oferta.id); load(); showToast('success', '🗑', 'Oferta eliminada', '') } })

@@ -128,7 +128,10 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-red" onClick={handleOrder}>🔥 Aprovechar Ahora</button>
+                <button className="btn btn-red" onClick={() => {
+                  useStore.getState().setSelOffer(oferta)
+                  handleOrder()
+                }}>🔥 Aprovechar Ahora</button>
               </div>
               <div style={{ fontSize: 'min(7rem,14vw)', textAlign: 'center' }}>{oferta.emoji}</div>
             </div>

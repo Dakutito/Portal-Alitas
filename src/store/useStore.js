@@ -17,17 +17,20 @@ export const useStore = create((set, get) => ({
 
   // Order state
   selCombo: null,
+  selOffer: null,
   salsas: {},
   arrozQty: {},
   bebCounts: {},
   tipoServicio: 'servir',
   setSelCombo: (c) => set({ selCombo: c }),
+  setSelOffer: (o) => set({ selOffer: o }),
   setSalsas: (s) => set({ salsas: s }),
   setArrozQty: (a) => set({ arrozQty: a }),
   setBebCounts: (b) => set({ bebCounts: b }),
   setTipoServicio: (t) => set({ tipoServicio: t }),
   resetOrder: () => set({
     selCombo: null,
+    selOffer: null,
     salsas: {},
     arrozQty: {},
     bebCounts: {},

@@ -38,6 +38,8 @@ export default function Order() {
 
   const isMobile = window.innerWidth <= 900
 
+  const { selOffer, setSelOffer } = useStore() // Use store for pre-selected offer
+
   useEffect(() => {
     if (!user) { navigate('/'); return }
     Promise.all([
@@ -55,8 +57,15 @@ export default function Order() {
       setTiposArroz(aList)
       const aq = {}; aList.forEach(x => aq[x.id] = 0)
       setArrozQty(aq); setEaQty({ ...aq })
+
       const of = o.data?.[0]
       if (of && of.activa) setOferta(of)
+
+      // Auto-select offer if coming from Home
+      if (selOffer && selOffer.activa) {
+        confirmOffer(selOffer)
+        setSelOffer(null) // Reset in store
+      }
     })
     const init = {}; SALSAS.forEach(s => init[s] = 0); setSalsas(init)
   }, [user])
@@ -84,32 +93,68 @@ export default function Order() {
     showToast('info', ccCombo?.es_jueves ? '⚡' : '🍗', 'Combo seleccionado', ccCombo.nombre + ' — elige tus salsas')
   }
 
+  const confirmOffer = (off) => {
+    // Treat offer as a special combo
+    const offCombo = { ...off, isOffer: true }
+    setSelCombo(offCombo)
+    const init = {}; SALSAS.forEach(s => init[s] = 0); setSalsas(init)
+    if (isMobile) setSidebarExpanded(true)
+    showToast('info', '⚡', 'Oferta seleccionada', off.titulo + ' — elige tus salsas')
+  }
+
   const doEnviarPedido = async () => {
     setOcOpen(false)
     const arrozSnapshot = {}
     tiposArroz.forEach(t => { if ((arrozQty[t.id] || 0) > 0) arrozSnapshot[t.id] = arrozQty[t.id] })
-    const { data: ped, error } = await supabase.from('pedidos').insert({
-      usuario_id: user.id, combo_id: selCombo.id, combo_precio: selCombo.precio,
-      total, tipo: tipoServicio, mesa: tipoServicio !== 'domicilio' ? mesa : '',
-      direccion: tipoServicio === 'domicilio' ? direccion : '', mensaje, estado: 'pendiente', arroz: arrozSnapshot
-    }).select().single()
-    if (error) { showToast('error', '⚠️', 'Error', error.message); return }
 
-    // Insert salsas
-    const salsaRows = Object.entries(salsas).filter(([, v]) => v > 0).map(([s, c]) => ({ pedido_id: ped.id, tipo_salsa: s, cantidad: c }))
-    if (salsaRows.length) await supabase.from('pedido_salsas').insert(salsaRows)
+    // Preparation for inserted data
+    const pedidoData = {
+      usuario_id: user.id,
+      combo_id: selCombo.isOffer ? null : selCombo.id,
+      combo_precio: selCombo.precio,
+      total,
+      tipo: tipoServicio,
+      mesa: tipoServicio !== 'domicilio' ? mesa : '',
+      direccion: tipoServicio === 'domicilio' ? direccion : '',
+      mensaje,
+      estado: 'pendiente',
+      arroz: arrozSnapshot,
+      mensaje: selCombo.isOffer ? `[OFERTA: ${selCombo.titulo}] ${mensaje}` : mensaje
+    }
 
-    // Insert bebidas extras
+    const { data: ped, error } = await supabase.from('pedidos').insert(pedidoData).select().single()
+
+    if (error) {
+      console.error("Error inserting order:", error)
+      showToast('error', '⚠️', 'Error', error.message)
+      return
+    }
+
+    // Insert salsas into NEW TABLE
+    const salsaRows = Object.entries(salsas).filter(([, v]) => v > 0).map(([s, c]) => ({
+      pedido_id: ped.id,
+      tipo_salsa: s,
+      cantidad: c
+    }))
+    if (salsaRows.length) {
+      const { error: sError } = await supabase.from('pedido_salsas').insert(salsaRows)
+      if (sError) console.error("Error inserting salsas:", sError)
+    }
+
+    // Insert bebidas extras into NEW TABLE
     const bebRows = Object.entries(bebCounts).filter(([, v]) => v > 0).map(([id, qty]) => {
       const b = bebidas.find(x => x.id == id)
       return b ? { pedido_id: ped.id, nombre: b.nombre, cantidad: qty, precio: b.precio, tipo: b.tipo } : null
     }).filter(Boolean)
-    if (bebRows.length) await supabase.from('pedido_extras').insert(bebRows)
+    if (bebRows.length) {
+      const { error: eError } = await supabase.from('pedido_extras').insert(bebRows)
+      if (eError) console.error("Error inserting extras:", eError)
+    }
 
+    useStore.getState().resetOrder() // Clean store
     setSuccessDom(tipoServicio === 'domicilio')
     setSuccess(true)
   }
-
   const pedirExtraArroz = async () => {
     if (!eaMesa) { showToast('error', '⚠️', 'Error', 'Ingresa el número de mesa.'); return }
     const selTipos = tiposArroz.filter(t => (eaQty[t.id] || 0) > 0)
@@ -186,11 +231,22 @@ export default function Order() {
           </div>
 
           {oferta && (
-            <div style={{ background: 'linear-gradient(135deg,#1a1000,#1d0d00)', border: '1.5px solid rgba(255,198,51,.35)', borderRadius: 15, padding: '1.5rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', fontSize: '.73rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '.28rem .75rem', borderRadius: 20, display: 'inline-block', marginBottom: '.5rem' }}>⚡ Oferta Especial</div>
+            <div className={`order-card ${selCombo?.isOffer ? 'selected' : ''}`}
+              onClick={() => confirmOffer(oferta)}
+              style={{
+                background: 'linear-gradient(135deg,#1a1000,#1d0d00)',
+                border: `1.5px solid ${selCombo?.isOffer ? 'var(--red)' : 'rgba(255,198,51,.35)'}`,
+                borderRadius: 15, padding: '1.5rem', marginBottom: '1.5rem', cursor: 'pointer',
+                boxShadow: selCombo?.isOffer ? '0 0 0 3px rgba(232,34,10,.18)' : 'none'
+              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', fontSize: '.73rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '.28rem .75rem', borderRadius: 20, display: 'inline-block', marginBottom: '.5rem' }}>⚡ Oferta Especial</div>
+                {selCombo?.isOffer && <span style={{ background: 'var(--red)', color: '#fff', fontSize: '.7rem', fontWeight: 700, padding: '.18rem .55rem', borderRadius: 6 }}>✔ Selected</span>}
+              </div>
               <h3 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '2.2rem', marginBottom: '.3rem' }}>{oferta.titulo}</h3>
               <p style={{ color: 'var(--gray)', fontSize: '.9rem', marginBottom: '.4rem' }} dangerouslySetInnerHTML={{ __html: oferta.descripcion }} />
               <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.3rem', color: 'var(--yellow)', marginBottom: '1rem' }}>${Number(oferta.precio).toFixed(2)} · {oferta.alitas} Alitas</div>
+              {!selCombo?.isOffer && <button className="btn btn-ghost btn-sm">+ Select Offer</button>}
             </div>
           )}
 
