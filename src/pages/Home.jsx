@@ -17,6 +17,8 @@ const SABORES = [
 export default function Home() {
   const [combos, setCombos] = useState([])
   const [oferta, setOferta] = useState(null)
+  const [bebidas, setBebidas] = useState([])
+  const [tiposArroz, setTiposArroz] = useState([])
   const [timer, setTimer] = useState({ h: '00', m: '00', s: '00' })
   const [authOpen, setAuthOpen] = useState(false)
   const { user, profile } = useStore()
@@ -36,6 +38,14 @@ export default function Home() {
         if (error) console.error("Home: Error fetching offer:", error)
         else if (data && data[0] && data[0].activa) setOferta(data[0])
       })
+
+    // Fetch beverages
+    supabase.from('bebidas').select('*').eq('activa', true)
+      .then(({ data }) => setBebidas(data || []))
+
+    // Fetch rice types
+    supabase.from('tipos_arroz').select('*').eq('activo', true)
+      .then(({ data }) => setTiposArroz(data || []))
   }, [])
 
   useEffect(() => {
@@ -160,6 +170,44 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* BEBIDAS */}
+      {bebidas.length > 0 && (
+        <section style={{ padding: '4rem 5vw' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <span className="section-tag">Bebidas</span>
+            <h2 className="section-title">Para Acompañar</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '1rem' }}>
+              {bebidas.map(b => (
+                <div key={b.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>{b.emoji}</div>
+                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginBottom: '.3rem' }}>{b.nombre}</div>
+                  <div style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(b.precio).toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ARROZ */}
+      {tiposArroz.length > 0 && (
+        <section style={{ padding: '4rem 5vw', background: 'var(--bg2)' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+            <span className="section-tag">Complementos</span>
+            <h2 className="section-title">Tipos de Arroz</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '1rem' }}>
+              {tiposArroz.map(a => (
+                <div key={a.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>{a.emoji}</div>
+                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginBottom: '.3rem' }}>{a.nombre}</div>
+                  <div style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(a.precio).toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* SABORES */}
       <section style={{ padding: '4rem 5vw' }}>

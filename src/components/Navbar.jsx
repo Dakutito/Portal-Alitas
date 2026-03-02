@@ -53,7 +53,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop links */}
-        <div style={{ display: 'flex', gap: '.15rem', flex: 1, justifyContent: 'center' }} className="nav-links-desktop hide-mobile">
+        <div style={{ display: 'flex', gap: '.15rem', flex: 1, justifyContent: 'center' }} className="nav-links-desktop hide-tablet-mobile">
           <NavBtn onClick={() => navigate('/')} active={location.pathname === '/'}>Home</NavBtn>
           {user && !isAdmin && <NavBtn onClick={() => navigate('/order')} active={location.pathname === '/order'}>Menú</NavBtn>}
           {user && !isAdmin && <NavBtn onClick={() => navigate('/status')} active={location.pathname === '/status'}>Mis Pedidos</NavBtn>}
@@ -79,8 +79,8 @@ export default function Navbar() {
               {profile?.nombre?.[0]?.toUpperCase() || '?'}
             </div>
           )}
-          {/* Hamburger */}
-          <button onClick={() => setDrawerOpen(true)} className="hide-desktop" style={{
+          {/* Hamburger (Always visible) */}
+          <button onClick={() => setDrawerOpen(true)} style={{
             background: 'none', border: 'none', color: 'var(--white)', cursor: 'pointer',
             padding: '.25rem', width: 38, height: 38, borderRadius: 8, display: 'flex',
             flexDirection: 'column', gap: 5, transition: 'background .2s',

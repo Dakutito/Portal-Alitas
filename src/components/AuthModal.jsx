@@ -117,11 +117,20 @@ export default function AuthModal({ tab: initialTab, onClose }) {
           email: form.email.trim(),
           rol: isAdminEmail ? 'admin' : 'user'
         })
-        const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle()
-        const finalProfile = prof || { id: data.user.id, nombre: form.nombre, email: form.email.trim(), rol: isAdminEmail ? 'admin' : 'user' }
-        setUser(data.user); setProfile(finalProfile)
-        showToast('success', '✅', '¡Cuenta creada!', 'Bienvenido, ' + form.nombre)
-        onClose()
+
+        // If session exists, user is already logged in (confirmation disabled)
+        if (data.session) {
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle()
+          const finalProfile = prof || { id: data.user.id, nombre: form.nombre, email: form.email.trim(), rol: isAdminEmail ? 'admin' : 'user' }
+          setUser(data.user); setProfile(finalProfile)
+          showToast('success', '✅', '¡Cuenta creada!', 'Bienvenido, ' + form.nombre)
+          onClose()
+          if (finalProfile.rol === 'admin') navigate('/admin')
+        } else {
+          // If no session, they might need to confirm email (if user haven't disabled it yet)
+          showToast('info', '📧', 'Verifica tu email', 'Te hemos enviado un enlace de confirmación.')
+          setTab('login')
+        }
       }
     } catch (e) {
       console.error('Register error:', e)
