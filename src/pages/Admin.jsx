@@ -457,20 +457,43 @@ function TabStats({ showToast, confirm }) {
     const invObj = {}; (i.data || []).forEach(x => invObj[x.clave] = x.valor)
     setInv(invObj)
 
-    // Calcular alitas usadas en pedidos activos (no completados/eliminados)
-    const pedidosActivos = allP.filter(x => !['completado', 'eliminado'].includes(x.estado))
+    // Calcular alitas usadas en pedidos
     const alitasUsadas = allP.reduce((a, pd) => {
       const co = allC.find(c => c.id === pd.combo_id)
       const wingsInOrder = pd.adicional?.alitas || (co ? co.alitas : 0)
       return a + wingsInOrder
     }, 0)
 
+    // Calcular ingresos de arroz (adicional.arroz es el total $ por pedido)
+    const arrozTotalRev = allP.reduce((a, pd) => a + Number(pd.adicional?.arroz || 0), 0)
+
+    // Contar bebidas usadas individualmente
+    const bebUsageMap = {}
+    allPE.forEach(e => {
+      if (e.tipo === 'normal' || e.tipo === 'alcohol') {
+        bebUsageMap[e.nombre] = (bebUsageMap[e.nombre] || 0) + e.cantidad
+      }
+    })
+
     const hoy = new Date().toDateString()
     const hoyP = allP.filter(x => new Date(x.created_at).toDateString() === hoy)
     const totalRev = allP.reduce((a, pd) => a + Number(pd.total || 0), 0)
     const bebNormal = allPE.filter(e => { const bv = allB.find(x => x.nombre === e.nombre); return bv?.tipo === 'normal' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
     const bebAlcohol = allPE.filter(e => { const bv = allB.find(x => x.nombre === e.nombre); return bv?.tipo === 'alcohol' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
-    setStats({ hoyP: hoyP.length, total: allP.length, usuarios: allU.length, pendientes: allP.filter(x => x.estado === 'pendiente').length, domicilios: allP.filter(x => x.tipo === 'domicilio').length, totalRev, alitasUsadas, bebNormal, bebAlcohol })
+
+    setStats({
+      hoyP: hoyP.length,
+      total: allP.length,
+      usuarios: allU.length,
+      pendientes: allP.filter(x => x.estado === 'pendiente').length,
+      domicilios: allP.filter(x => x.tipo === 'domicilio').length,
+      totalRev,
+      alitasUsadas,
+      bebNormal,
+      bebAlcohol,
+      arrozTotalRev,
+      bebUsageMap
+    })
   }
 
   useEffect(() => { load() }, [])
@@ -566,26 +589,35 @@ function TabStats({ showToast, confirm }) {
         {/* BEBIDAS */}
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
           <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.65rem' }}>🥤 Control de Bebidas</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '.65rem' }}>
-            {bebidas.map(b => (
-              <div key={b.id} style={{ background: 'var(--bg4)', border: `1px solid ${(inv['beb_' + b.id] ?? 1) <= 0 ? 'rgba(239,68,68,.4)' : 'var(--border)'}`, borderRadius: 9, padding: '.75rem' }}>
-                <div style={{ fontSize: '.82rem', fontWeight: 600, marginBottom: '.4rem' }}>{b.emoji} {b.nombre}</div>
-                <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.4rem', alignItems: 'center' }}>
-                  <input
-                    type="number" placeholder="Stock" min="0"
-                    value={invInputs['beb_' + b.id] ?? (inv['beb_' + b.id] !== undefined ? inv['beb_' + b.id] : '')}
-                    onChange={e => setInvInputs(p => ({ ...p, ['beb_' + b.id]: e.target.value }))}
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.3rem .5rem', borderRadius: 6, fontSize: '.78rem', outline: 'none', width: 75 }}
-                  />
-                  <button className="btn btn-success btn-sm" style={{ padding: '.28rem .55rem', fontSize: '.72rem' }} onClick={() => saveInvBeb(b)}>💾</button>
-                </div>
-                {inv['beb_' + b.id] !== undefined && (
-                  <div style={{ fontSize: '.73rem', color: inv['beb_' + b.id] <= 0 ? '#f87171' : '#4ade80', fontWeight: 600 }}>
-                    {inv['beb_' + b.id] <= 0 ? '⚠️ Sin stock' : `✅ ${inv['beb_' + b.id]} uds`}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: '.65rem' }}>
+            {bebidas.map(b => {
+              const total = inv['beb_' + b.id] ?? 0
+              const usadas = stats.bebUsageMap[b.nombre] || 0
+              const disponible = Math.max(0, total - usadas)
+              const esBajo = disponible <= 3
+
+              return (
+                <div key={b.id} style={{ background: 'var(--bg4)', border: `1px solid ${disponible <= 0 ? 'rgba(239,68,68,.4)' : 'var(--border)'}`, borderRadius: 9, padding: '.75rem' }}>
+                  <div style={{ fontSize: '.82rem', fontWeight: 600, marginBottom: '.4rem' }}>{b.emoji} {b.nombre}</div>
+                  <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.6rem', alignItems: 'center' }}>
+                    <input
+                      type="number" placeholder="Stock total" min="0"
+                      value={invInputs['beb_' + b.id] ?? (inv['beb_' + b.id] !== undefined ? inv['beb_' + b.id] : '')}
+                      onChange={e => setInvInputs(p => ({ ...p, ['beb_' + b.id]: e.target.value }))}
+                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.3rem .5rem', borderRadius: 6, fontSize: '.78rem', outline: 'none', width: 85 }}
+                    />
+                    <button className="btn btn-success btn-sm" style={{ padding: '.28rem .55rem', fontSize: '.72rem' }} onClick={() => saveInvBeb(b)}>💾</button>
                   </div>
-                )}
-              </div>
-            ))}
+                  <div style={{ fontSize: '.7rem', color: 'var(--gray)', display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
+                    <div>Total ingresado: <span style={{ color: 'var(--white)' }}>{total}</span></div>
+                    <div>Usadas pedidos: <span style={{ color: 'var(--yellow)' }}>{usadas}</span></div>
+                    <div style={{ fontWeight: 700, color: disponible <= 0 ? '#f87171' : esBajo ? '#fbbf24' : '#4ade80', marginTop: '.2rem' }}>
+                      {disponible <= 0 ? '❌ Sin stock' : `${esBajo ? '⚠️' : '✅'} Disponibles: ${disponible}`}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -600,6 +632,7 @@ function TabStats({ showToast, confirm }) {
       <div className="totales-grid">
         <div className="totales-card hl"><h4>💵 Ingreso Total</h4><div className="tot-val">${stats.totalRev.toFixed(2)}</div></div>
         <div className="totales-card"><h4>🐔 Alitas Vendidas</h4><div className="tot-val">{stats.alitasUsadas}</div></div>
+        <div className="totales-card"><h4>🍚 Arroz Total</h4><div className="tot-val">${stats.arrozTotalRev.toFixed(2)}</div></div>
         <div className="totales-card"><h4>🥤 Bebidas S/Alcohol</h4><div className="tot-val">${stats.bebNormal.toFixed(2)}</div></div>
         <div className="totales-card"><h4>🍺 Alcohólicas</h4><div className="tot-val">${stats.bebAlcohol.toFixed(2)}</div></div>
       </div>
