@@ -15,8 +15,8 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     setDrawerOpen(false)
+    logout()
     await supabase.auth.signOut()
-    // onAuthStateChange en App.jsx dispara SIGNED_OUT y llama logout() automáticamente
     showToast('info', '👋', 'Sesión cerrada', '¡Hasta pronto!')
     navigate('/')
   }
@@ -48,43 +48,40 @@ export default function Navbar() {
         {/* Links desktop */}
         <div className="desk-links">
           <NavLink onClick={() => navigate('/')} active={location.pathname === '/'}>Inicio</NavLink>
-          {!isAdmin && <NavLink onClick={() => user ? navigate('/order') : openAuth('login')} active={location.pathname === '/order'}>🍗 Menú</NavLink>}
-          {user && !isAdmin && <NavLink onClick={() => navigate('/status')} active={location.pathname === '/status'}>📦 Pedidos</NavLink>}
-          {isAdmin && <NavLink onClick={() => navigate('/admin')} active={location.pathname === '/admin'}>👑 Admin</NavLink>}
+          {!isAdmin && (
+            <NavLink onClick={() => user ? navigate('/order') : openAuth('login')} active={location.pathname === '/order'}>
+              🍗 Menú
+            </NavLink>
+          )}
+          {user && !isAdmin && (
+            <NavLink onClick={() => navigate('/status')} active={location.pathname === '/status'}>
+              📦 Pedidos
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink onClick={() => navigate('/admin')} active={location.pathname === '/admin'}>
+              👑 Admin
+            </NavLink>
+          )}
         </div>
 
-        {/* Derecha: avatar + botón login + hamburguesa */}
+        {/* Derecha: solo avatar o botón login + hamburguesa */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', flexShrink: 0 }}>
-          {user && (
-            <>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,var(--red),var(--orange))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontFamily: "'Bebas Neue',cursive", fontSize: '.95rem', border: '2px solid rgba(255,255,255,.15)', flexShrink: 0 }}>
-                {profile?.nombre?.[0]?.toUpperCase() || '?'}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="btn-logout-desk"
-                style={{
-                  background: 'rgba(232,34,10,.1)',
-                  border: '1px solid rgba(232,34,10,.3)',
-                  color: 'var(--red)',
-                  padding: '.35rem .7rem',
-                  borderRadius: 7,
-                  fontSize: '.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all .2s'
-                }}
-              >
-                Cerrar Sesión
-              </button>
-            </>
-          )}
-          {!user && (
+          {user ? (
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: 'linear-gradient(135deg,var(--red),var(--orange))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 700, color: '#fff', fontFamily: "'Bebas Neue',cursive",
+              fontSize: '.95rem', border: '2px solid rgba(255,255,255,.15)', flexShrink: 0
+            }}>
+              {profile?.nombre?.[0]?.toUpperCase() || '?'}
+            </div>
+          ) : (
             <button onClick={() => openAuth('login')} className="btn-login-desk">
               Iniciar Sesión
             </button>
           )}
-          {/* Hamburguesa SIEMPRE visible */}
           <button onClick={() => setDrawerOpen(true)} className="hamburger-btn" aria-label="Menú">
             <span /><span /><span />
           </button>
@@ -93,7 +90,9 @@ export default function Navbar() {
 
       {/* Backdrop */}
       {drawerOpen && (
-        <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1198, background: 'rgba(0,0,0,.5)' }} />
+        <div onClick={() => setDrawerOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 1198, background: 'rgba(0,0,0,.5)'
+        }} />
       )}
 
       {/* Drawer lateral */}
@@ -105,21 +104,43 @@ export default function Navbar() {
         transition: 'transform .28s cubic-bezier(.4,0,.2,1)'
       }}>
         {/* Header drawer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.2rem', borderBottom: '1px solid var(--border)', height: 'var(--nav)' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '1rem 1.2rem', borderBottom: '1px solid var(--border)', height: 'var(--nav)'
+        }}>
           <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.2rem', letterSpacing: 2 }}>🔥 Menú</span>
-          <button onClick={() => setDrawerOpen(false)} style={{ background: 'rgba(255,255,255,.07)', border: 'none', color: 'var(--white)', width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          <button onClick={() => setDrawerOpen(false)} style={{
+            background: 'rgba(255,255,255,.07)', border: 'none', color: 'var(--white)',
+            width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: '1.1rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>✕</button>
         </div>
 
         {/* Info usuario */}
         {user && profile && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '1.1rem 1.2rem', borderBottom: '1px solid var(--border)', background: 'var(--bg3)' }}>
-            <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'linear-gradient(135deg,var(--red),var(--orange))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontFamily: "'Bebas Neue',cursive", fontSize: '1.1rem', flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '.75rem',
+            padding: '1.1rem 1.2rem', borderBottom: '1px solid var(--border)', background: 'var(--bg3)'
+          }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: '50%',
+              background: 'linear-gradient(135deg,var(--red),var(--orange))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 700, color: '#fff', fontFamily: "'Bebas Neue',cursive",
+              fontSize: '1.1rem', flexShrink: 0
+            }}>
               {profile.nombre?.[0]?.toUpperCase()}
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '.93rem' }}>{profile.nombre}</div>
               <div style={{ fontSize: '.75rem', color: 'var(--gray)' }}>{profile.email}</div>
-              {isAdmin && <span style={{ fontSize: '.65rem', background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', padding: '.1rem .4rem', borderRadius: 5, fontWeight: 700, textTransform: 'uppercase' }}>Admin</span>}
+              {isAdmin && (
+                <span style={{
+                  fontSize: '.65rem', background: 'rgba(232,34,10,.2)', color: 'var(--red)',
+                  border: '1px solid rgba(232,34,10,.3)', padding: '.1rem .4rem',
+                  borderRadius: 5, fontWeight: 700, textTransform: 'uppercase'
+                }}>Admin</span>
+              )}
             </div>
           </div>
         )}
@@ -128,30 +149,50 @@ export default function Navbar() {
         <div style={{ flex: 1, padding: '1rem .75rem', display: 'flex', flexDirection: 'column', gap: '.2rem' }}>
           <DrawerLink onClick={() => go('/')} active={location.pathname === '/'}>🏠 Inicio</DrawerLink>
           {!isAdmin && (
-            <DrawerLink onClick={() => { setDrawerOpen(false); user ? navigate('/order') : openAuth('login') }} active={location.pathname === '/order'}>
+            <DrawerLink
+              onClick={() => { setDrawerOpen(false); user ? navigate('/order') : openAuth('login') }}
+              active={location.pathname === '/order'}>
               🍗 Hacer Pedido
             </DrawerLink>
           )}
           {user && !isAdmin && (
-            <DrawerLink onClick={() => go('/status')} active={location.pathname === '/status'}>📦 Mis Pedidos</DrawerLink>
+            <DrawerLink onClick={() => go('/status')} active={location.pathname === '/status'}>
+              📦 Mis Pedidos
+            </DrawerLink>
           )}
           {isAdmin && (
-            <DrawerLink onClick={() => go('/admin')} active={location.pathname === '/admin'} admin>👑 Panel Admin</DrawerLink>
+            <DrawerLink onClick={() => go('/admin')} active={location.pathname === '/admin'} admin>
+              👑 Panel Admin
+            </DrawerLink>
           )}
         </div>
 
         {/* Botones login / logout */}
-        <div style={{ padding: '1rem 1.2rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+        <div style={{
+          padding: '1rem 1.2rem', borderTop: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column', gap: '.55rem'
+        }}>
           {user ? (
-            <button onClick={handleLogout} style={{ background: 'rgba(232,34,10,.1)', border: '1px solid rgba(232,34,10,.3)', color: 'var(--red)', padding: '.75rem', borderRadius: 10, width: '100%', fontWeight: 700, cursor: 'pointer', fontSize: '.95rem' }}>
+            <button onClick={handleLogout} style={{
+              background: 'rgba(232,34,10,.1)', border: '1px solid rgba(232,34,10,.3)',
+              color: 'var(--red)', padding: '.75rem', borderRadius: 10,
+              width: '100%', fontWeight: 700, cursor: 'pointer', fontSize: '.95rem'
+            }}>
               👋 Cerrar Sesión
             </button>
           ) : (
             <>
-              <button onClick={() => openAuth('login')} style={{ background: 'var(--red)', border: 'none', color: '#fff', padding: '.75rem', borderRadius: 10, width: '100%', fontWeight: 700, cursor: 'pointer', fontSize: '.95rem' }}>
+              <button onClick={() => openAuth('login')} style={{
+                background: 'var(--red)', border: 'none', color: '#fff', padding: '.75rem',
+                borderRadius: 10, width: '100%', fontWeight: 700, cursor: 'pointer', fontSize: '.95rem'
+              }}>
                 🔥 Iniciar Sesión
               </button>
-              <button onClick={() => openAuth('register')} style={{ background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)', color: 'var(--white)', padding: '.75rem', borderRadius: 10, width: '100%', fontWeight: 600, cursor: 'pointer', fontSize: '.95rem' }}>
+              <button onClick={() => openAuth('register')} style={{
+                background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.12)',
+                color: 'var(--white)', padding: '.75rem', borderRadius: 10,
+                width: '100%', fontWeight: 600, cursor: 'pointer', fontSize: '.95rem'
+              }}>
                 ✨ Crear Cuenta
               </button>
             </>
@@ -178,8 +219,7 @@ function NavLink({ children, onClick, active }) {
 function DrawerLink({ children, onClick, active, admin }) {
   return (
     <button onClick={onClick} style={{
-      background: active ? 'rgba(255,255,255,.06)' : 'none',
-      border: 'none',
+      background: active ? 'rgba(255,255,255,.06)' : 'none', border: 'none',
       color: admin ? 'var(--red)' : active ? 'var(--white)' : 'rgba(242,237,230,.7)',
       fontSize: '.97rem', fontWeight: 500, padding: '.82rem 1rem',
       borderRadius: 10, cursor: 'pointer', transition: 'all .18s',
