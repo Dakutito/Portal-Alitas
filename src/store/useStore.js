@@ -3,8 +3,10 @@ import { create } from 'zustand'
 export const useStore = create((set) => ({
   user: null,
   profile: null,
+  ready: false,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
+  setReady: (v) => set({ ready: v }),
   logout: () => set({ user: null, profile: null }),
 
   toast: null,
