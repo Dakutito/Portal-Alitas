@@ -49,7 +49,7 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
           {sauceItems.length > 0 && (
             <>
               <div className="sc-section-title"><span>🟡</span> SALSAS / SAUCES</div>
-              <div className={`sc-chip-grid ${drinkItems.length > 0 ? '' : ''}`} style={{ marginBottom: drinkItems.length > 0 ? '1.5rem' : 0 }}>
+              <div className="sc-chip-grid" style={{ marginBottom: drinkItems.length > 0 ? '1.5rem' : 0 }}>
                 {sauceItems.map((it, i) => (
                   <div key={i} className="sc-chip">
                     <span className="sc-chip-name">{it.name}</span>
@@ -86,6 +86,28 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, borderTop: '1px solid rgba(167,139,250,.2)', marginTop: '.4rem', paddingTop: '.4rem', fontSize: '.82rem' }}>
             <span style={{ color: 'var(--purple)' }}>Total adicional</span>
             <span style={{ color: 'var(--yellow)' }}>${adicionalTotal.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
+      {pedido.tipo === 'domicilio' && pedido.direccion && (
+        <div style={{ marginTop: '1rem', padding: '.8rem', background: 'rgba(96,165,250,.1)', border: '1px solid rgba(96,165,250,.2)', borderRadius: 10 }}>
+          <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--blue)', textTransform: 'uppercase', marginBottom: '.3rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+            <span>📍</span> DIRECCIÓN DE ENTREGA
+          </div>
+          <div style={{ fontSize: '.9rem', color: 'var(--white)', fontWeight: 500, lineHeight: 1.4 }}>
+            {pedido.direccion}
+          </div>
+        </div>
+      )}
+
+      {pedido.mensaje && (
+        <div style={{ marginTop: '1rem', padding: '.8rem', background: 'rgba(255,255,255,.05)', border: '1px solid var(--border)', borderRadius: 10 }}>
+          <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--gray)', textTransform: 'uppercase', marginBottom: '.3rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+            <span>💬</span> NOTA DEL CLIENTE
+          </div>
+          <div style={{ fontSize: '.85rem', color: 'var(--white)', fontStyle: 'italic' }}>
+            "{pedido.mensaje}"
           </div>
         </div>
       )}
