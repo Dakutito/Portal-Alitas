@@ -86,12 +86,22 @@ export default function Order() {
 
   const doEnviarPedido = async () => {
     setOcOpen(false)
+    const isOffer = selCombo?.id && String(selCombo.id).startsWith('oferta_')
+    const finalMensaje = isOffer ? `⚡ OFERTA: ${selCombo.nombre}\n${mensaje}` : mensaje
+
     const arrozSnapshot = {}
     tiposArroz.forEach(t => { if ((arrozQty[t.id] || 0) > 0) arrozSnapshot[t.id] = arrozQty[t.id] })
     const { data: ped, error } = await supabase.from('pedidos').insert({
-      usuario_id: user.id, combo_id: selCombo.id, combo_precio: selCombo.precio,
-      total, tipo: tipoServicio, mesa: tipoServicio !== 'domicilio' ? mesa : '',
-      direccion: tipoServicio === 'domicilio' ? direccion : '', mensaje, estado: 'pendiente', arroz: arrozSnapshot
+      usuario_id: user.id,
+      combo_id: isOffer ? null : selCombo.id,
+      combo_precio: selCombo.precio,
+      total,
+      tipo: tipoServicio,
+      mesa: tipoServicio !== 'domicilio' ? mesa : '',
+      direccion: tipoServicio === 'domicilio' ? direccion : '',
+      mensaje: finalMensaje,
+      estado: 'pendiente',
+      arroz: arrozSnapshot
     }).select().single()
     if (error) { showToast('error', '⚠️', 'Error', error.message); return }
 
@@ -186,11 +196,22 @@ export default function Order() {
           </div>
 
           {oferta && (
-            <div style={{ background: 'linear-gradient(135deg,#1a1000,#1d0d00)', border: '1.5px solid rgba(255,198,51,.35)', borderRadius: 15, padding: '1.5rem', marginBottom: '1.5rem' }}>
+            <div
+              onClick={() => selectCombo({ ...oferta, nombre: oferta.titulo, id: 'oferta_' + oferta.id })}
+              style={{
+                background: 'linear-gradient(135deg,#1a1000,#1d0d00)',
+                border: selCombo?.id === 'oferta_' + oferta.id ? '2px solid var(--red)' : '1.5px solid rgba(255,198,51,.35)',
+                borderRadius: 15, padding: '1.5rem', marginBottom: '1.5rem', cursor: 'pointer',
+                transition: 'all .25s', scale: selCombo?.id === 'oferta_' + oferta.id ? '1.02' : '1',
+                boxShadow: selCombo?.id === 'oferta_' + oferta.id ? '0 0 20px rgba(232,34,10,.25)' : 'none'
+              }}>
               <div style={{ background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', fontSize: '.73rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '.28rem .75rem', borderRadius: 20, display: 'inline-block', marginBottom: '.5rem' }}>⚡ Oferta Especial</div>
               <h3 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '2.2rem', marginBottom: '.3rem' }}>{oferta.titulo}</h3>
               <p style={{ color: 'var(--gray)', fontSize: '.9rem', marginBottom: '.4rem' }} dangerouslySetInnerHTML={{ __html: oferta.descripcion }} />
               <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.3rem', color: 'var(--yellow)', marginBottom: '1rem' }}>${Number(oferta.precio).toFixed(2)} · {oferta.alitas} Alitas</div>
+              {selCombo?.id === 'oferta_' + oferta.id && (
+                <span style={{ background: 'var(--red)', color: '#fff', fontSize: '.75rem', fontWeight: 700, padding: '.3rem .8rem', borderRadius: 8 }}>✔ Oferta Seleccionada</span>
+              )}
             </div>
           )}
 
