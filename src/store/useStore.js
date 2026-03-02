@@ -6,6 +6,7 @@ export const useStore = create((set) => ({
   ready: false,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
+  setAuth: (user, profile) => set({ user, profile }),
   setReady: (v) => set({ ready: v }),
   logout: () => set({ user: null, profile: null }),
 

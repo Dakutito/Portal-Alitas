@@ -21,48 +21,41 @@ export default function App() {
   const { setUser, setProfile, logout, setReady } = useStore()
 
   useEffect(() => {
-    // 1. Verificar sesión existente AL INICIO (antes de cualquier evento)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user)
-        try {
-          const { data: prof } = await supabase
-            .from('profiles').select('*').eq('id', session.user.id).single()
-          setProfile(prof || {
-            id: session.user.id,
-            email: session.user.email,
-            nombre: session.user.user_metadata?.nombre || 'Usuario',
-            rol: 'user'
-          })
-        } catch (e) { }
-      } else {
+    const updateAuth = async (session) => {
+      if (!session) {
         logout()
-      }
-      setReady(true)
-    }).catch(err => {
-      console.error('Initial session check failed:', err)
-      setReady(true) // Al menos dejamos que la app se muestre
-    })
-
-    // 2. Escuchar cambios futuros (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        logout()
+        setReady(true)
         return
       }
-      if (session?.user) {
-        setUser(session.user)
-        try {
-          const { data: prof } = await supabase
-            .from('profiles').select('*').eq('id', session.user.id).single()
-          setProfile(prof || {
-            id: session.user.id,
-            email: session.user.email,
-            nombre: session.user.user_metadata?.nombre || 'Usuario',
-            rol: 'user'
-          })
-        } catch (e) { }
+
+      const user = session.user
+      setUser(user)
+
+      try {
+        const { data: prof } = await supabase
+          .from('profiles').select('*').eq('id', user.id).single()
+
+        setProfile(prof || {
+          id: user.id,
+          email: user.email,
+          nombre: user.user_metadata?.nombre || 'Usuario',
+          rol: 'user'
+        })
+      } catch (e) {
+        console.error('Auth sync error:', e)
+      } finally {
+        setReady(true)
       }
+    }
+
+    // 1. Carga inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      updateAuth(session)
+    })
+
+    // 2. Escuchar cambios
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      updateAuth(session)
     })
 
     return () => subscription.unsubscribe()

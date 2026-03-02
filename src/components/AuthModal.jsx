@@ -77,12 +77,14 @@ export default function AuthModal({ tab: initialTab, onClose }) {
       }
 
       if (data.user) {
-        await supabase.from('profiles').upsert({
+        const newProfile = {
           id: data.user.id,
           nombre: nombre.trim(),
           email: email.trim().toLowerCase(),
           rol: 'user'
-        }, { onConflict: 'id' })
+        }
+
+        await supabase.from('profiles').upsert(newProfile, { onConflict: 'id' })
 
         showToast('success', '✅', '¡Cuenta creada!', `Bienvenido, ${nombre.trim()}`)
         onClose()
