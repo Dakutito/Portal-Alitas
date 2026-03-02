@@ -1,9 +1,9 @@
 const SI_MAP = {
-  pendiente:   { cls: 'st-pendiente',   label: '⏳ Pendiente',       icon: '⏳' },
-  preparacion: { cls: 'st-preparacion', label: '🔥 En preparación',  icon: '🔥' },
-  listo:       { cls: 'st-listo',       label: '✅ Listo',           icon: '✅' },
-  completado:  { cls: 'st-completado',  label: '✔ Completado',       icon: '✔' },
-  eliminado:   { cls: 'st-eliminado',   label: '❌ Cancelado',       icon: '❌' },
+  pendiente: { cls: 'st-pendiente', label: '⏳ Pendiente', icon: '⏳' },
+  preparacion: { cls: 'st-preparacion', label: '🔥 En preparación', icon: '🔥' },
+  listo: { cls: 'st-listo', label: '✅ Listo', icon: '✅' },
+  completado: { cls: 'st-completado', label: '✔ Completado', icon: '✔' },
+  eliminado: { cls: 'st-eliminado', label: '❌ Cancelado', icon: '❌' },
 }
 const TIPO_LABEL = { servir: '🍽 Servir en mesa', llevar: '🥡 Llevar', domicilio: '🛵 Domicilio' }
 

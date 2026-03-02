@@ -38,8 +38,6 @@ export default function Order() {
 
   const isMobile = window.innerWidth <= 900
 
-  const { selOffer, setSelOffer } = useStore() // Use store for pre-selected offer
-
   useEffect(() => {
     if (!user) { navigate('/'); return }
     Promise.all([
@@ -57,15 +55,8 @@ export default function Order() {
       setTiposArroz(aList)
       const aq = {}; aList.forEach(x => aq[x.id] = 0)
       setArrozQty(aq); setEaQty({ ...aq })
-
       const of = o.data?.[0]
       if (of && of.activa) setOferta(of)
-
-      // Auto-select offer if coming from Home
-      if (selOffer && selOffer.activa) {
-        confirmOffer(selOffer)
-        setSelOffer(null) // Reset in store
-      }
     })
     const init = {}; SALSAS.forEach(s => init[s] = 0); setSalsas(init)
   }, [user])
@@ -93,101 +84,32 @@ export default function Order() {
     showToast('info', ccCombo?.es_jueves ? '⚡' : '🍗', 'Combo seleccionado', ccCombo.nombre + ' — elige tus salsas')
   }
 
-  const confirmOffer = (off) => {
-    // Treat offer as a special combo
-    const offCombo = { ...off, isOffer: true }
-    setSelCombo(offCombo)
-    const init = {}; SALSAS.forEach(s => init[s] = 0); setSalsas(init)
-    if (isMobile) setSidebarExpanded(true)
-    showToast('info', '⚡', 'Oferta seleccionada', off.titulo + ' — elige tus salsas')
-  }
-
   const doEnviarPedido = async () => {
     setOcOpen(false)
     const arrozSnapshot = {}
     tiposArroz.forEach(t => { if ((arrozQty[t.id] || 0) > 0) arrozSnapshot[t.id] = arrozQty[t.id] })
+    const { data: ped, error } = await supabase.from('pedidos').insert({
+      usuario_id: user.id, combo_id: selCombo.id, combo_precio: selCombo.precio,
+      total, tipo: tipoServicio, mesa: tipoServicio !== 'domicilio' ? mesa : '',
+      direccion: tipoServicio === 'domicilio' ? direccion : '', mensaje, estado: 'pendiente', arroz: arrozSnapshot
+    }).select().single()
+    if (error) { showToast('error', '⚠️', 'Error', error.message); return }
 
-    // Preparation for inserted data
-    const pedidoData = {
-      usuario_id: user.id,
-      combo_id: selCombo.isOffer ? null : selCombo.id,
-      combo_precio: selCombo.precio,
-      total,
-      tipo: tipoServicio,
-      mesa: tipoServicio !== 'domicilio' ? mesa : '',
-      direccion: tipoServicio === 'domicilio' ? direccion : '',
-      estado: 'pendiente',
-      arroz: arrozSnapshot,
-      mensaje: selCombo.isOffer ? `[OFERTA: ${selCombo.titulo}] ${mensaje}` : mensaje
-    }
+    // Insert salsas
+    const salsaRows = Object.entries(salsas).filter(([, v]) => v > 0).map(([s, c]) => ({ pedido_id: ped.id, tipo_salsa: s, cantidad: c }))
+    if (salsaRows.length) await supabase.from('pedido_salsas').insert(salsaRows)
 
-    const { data: ped, error } = await supabase.from('pedidos').insert(pedidoData).select().single()
-
-    if (error) {
-      console.error("Error inserting order:", error)
-      showToast('error', '⚠️', 'Error', error.message)
-      return
-    }
-
-    // --- INVENTORY UPDATE ---
-    try {
-      // 1. Alitas
-      const alitasNeeded = selCombo.alitas || 0
-      if (alitasNeeded > 0) {
-        const { data: invAlitas } = await supabase.from('inventario').select('valor').eq('clave', 'alitas').single()
-        if (invAlitas) {
-          await supabase.from('inventario').update({ valor: Math.max(0, invAlitas.valor - alitasNeeded) }).eq('clave', 'alitas')
-        }
-      }
-
-      // 2. Arroz
-      for (const tId in arrozSnapshot) {
-        const qty = arrozSnapshot[tId]
-        const { data: invArroz } = await supabase.from('inventario').select('valor').eq('clave', 'arroz').single()
-        if (invArroz) {
-          await supabase.from('inventario').update({ valor: Math.max(0, invArroz.valor - qty) }).eq('clave', 'arroz')
-        }
-      }
-
-      // 3. Bebidas
-      for (const bId in bebCounts) {
-        const qty = bebCounts[bId]
-        if (qty > 0) {
-          const { data: invBeb } = await supabase.from('inventario').select('valor').eq('clave', 'beb_' + bId).single()
-          if (invBeb) {
-            await supabase.from('inventario').update({ valor: Math.max(0, invBeb.valor - qty) }).eq('clave', 'beb_' + bId)
-          }
-        }
-      }
-    } catch (invErr) {
-      console.error("Inventory update error:", invErr)
-    }
-
-    // Insert salsas into NEW TABLE
-    const salsaRows = Object.entries(salsas).filter(([, v]) => v > 0).map(([s, c]) => ({
-      pedido_id: ped.id,
-      tipo_salsa: s,
-      cantidad: c
-    }))
-    if (salsaRows.length) {
-      const { error: sError } = await supabase.from('pedido_salsas').insert(salsaRows)
-      if (sError) console.error("Error inserting salsas:", sError)
-    }
-
-    // Insert bebidas extras into NEW TABLE
+    // Insert bebidas extras
     const bebRows = Object.entries(bebCounts).filter(([, v]) => v > 0).map(([id, qty]) => {
       const b = bebidas.find(x => x.id == id)
       return b ? { pedido_id: ped.id, nombre: b.nombre, cantidad: qty, precio: b.precio, tipo: b.tipo } : null
     }).filter(Boolean)
-    if (bebRows.length) {
-      const { error: eError } = await supabase.from('pedido_extras').insert(bebRows)
-      if (eError) console.error("Error inserting extras:", eError)
-    }
+    if (bebRows.length) await supabase.from('pedido_extras').insert(bebRows)
 
-    useStore.getState().resetOrder() // Clean store
     setSuccessDom(tipoServicio === 'domicilio')
     setSuccess(true)
   }
+
   const pedirExtraArroz = async () => {
     if (!eaMesa) { showToast('error', '⚠️', 'Error', 'Ingresa el número de mesa.'); return }
     const selTipos = tiposArroz.filter(t => (eaQty[t.id] || 0) > 0)
@@ -207,25 +129,9 @@ export default function Order() {
       selTipos.forEach(t => adicional.items.push({ desc: `${t.emoji || '🍚'} ${t.nombre} ×${eaQty[t.id]}`, subtotal: t.precio * eaQty[t.id] }))
       adicional.arroz = Number(adicional.arroz || 0) + tot
       await supabase.from('pedidos').update({ arroz: newArroz, adicional, total: Number(activo.total) + tot, modificado: true, ultima_mod: new Date().toISOString() }).eq('id', activo.id)
-
-      // Update inventory for arroz
-      const { data: invArroz } = await supabase.from('inventario').select('valor').eq('clave', 'arroz').single()
-      if (invArroz) {
-        const totalQty = selTipos.reduce((a, t) => a + eaQty[t.id], 0)
-        await supabase.from('inventario').update({ valor: Math.max(0, invArroz.valor - totalQty) }).eq('clave', 'arroz')
-      }
-
       showToast('success', '🍚', '¡Arroz agregado!', `Mesa ${eaMesa} · +$${tot.toFixed(2)}`)
     } else {
       await supabase.from('pedidos').insert({ usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot, tipo: 'servir', mesa: eaMesa, mensaje: 'Solo arroz', estado: 'pendiente', es_extra: true, tipo_extra: 'arroz', arroz: arrozExtra })
-
-      // Update inventory for arroz
-      const { data: invArroz } = await supabase.from('inventario').select('valor').eq('clave', 'arroz').single()
-      if (invArroz) {
-        const totalQty = selTipos.reduce((a, t) => a + eaQty[t.id], 0)
-        await supabase.from('inventario').update({ valor: Math.max(0, invArroz.valor - totalQty) }).eq('clave', 'arroz')
-      }
-
       showToast('success', '🍚', '¡Arroz pedido!', `Mesa ${eaMesa} · $${tot.toFixed(2)}`)
     }
     const reset = {}; tiposArroz.forEach(t => reset[t.id] = 0)
@@ -251,29 +157,12 @@ export default function Order() {
       await supabase.from('pedidos').update({ adicional, total: Number(activo.total) + tot, modificado: true, ultima_mod: new Date().toISOString() }).eq('id', activo.id)
       const rows = bebRows.map(r => ({ ...r, pedido_id: activo.id }))
       await supabase.from('pedido_extras').insert(rows)
-
-      // Update inventory for bebidas
-      for (const b of selBeb) {
-        const { data: invBeb } = await supabase.from('inventario').select('valor').eq('clave', 'beb_' + b.id).single()
-        if (invBeb) {
-          await supabase.from('inventario').update({ valor: Math.max(0, invBeb.valor - ebCounts[b.id]) }).eq('clave', 'beb_' + b.id)
-        }
-      }
-
       showToast('success', '🥤', '¡Bebidas agregadas!', `Mesa ${ebMesa} · +$${tot.toFixed(2)}`)
     } else {
       const { data: ped } = await supabase.from('pedidos').insert({ usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot, tipo: 'servir', mesa: ebMesa, mensaje: 'Solo bebidas', estado: 'pendiente', es_extra: true, tipo_extra: 'bebida' }).select().single()
       if (ped) {
         const rows = bebRows.map(r => ({ ...r, pedido_id: ped.id }))
         await supabase.from('pedido_extras').insert(rows)
-
-        // Update inventory for bebidas
-        for (const b of selBeb) {
-          const { data: invBeb } = await supabase.from('inventario').select('valor').eq('clave', 'beb_' + b.id).single()
-          if (invBeb) {
-            await supabase.from('inventario').update({ valor: Math.max(0, invBeb.valor - ebCounts[b.id]) }).eq('clave', 'beb_' + b.id)
-          }
-        }
       }
       showToast('success', '🥤', '¡Bebidas pedidas!', `Mesa ${ebMesa} · $${tot.toFixed(2)}`)
     }
@@ -297,22 +186,11 @@ export default function Order() {
           </div>
 
           {oferta && (
-            <div className={`order-card ${selCombo?.isOffer ? 'selected' : ''}`}
-              onClick={() => confirmOffer(oferta)}
-              style={{
-                background: 'linear-gradient(135deg,#1a1000,#1d0d00)',
-                border: `1.5px solid ${selCombo?.isOffer ? 'var(--red)' : 'rgba(255,198,51,.35)'}`,
-                borderRadius: 15, padding: '1.5rem', marginBottom: '1.5rem', cursor: 'pointer',
-                boxShadow: selCombo?.isOffer ? '0 0 0 3px rgba(232,34,10,.18)' : 'none'
-              }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', fontSize: '.73rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '.28rem .75rem', borderRadius: 20, display: 'inline-block', marginBottom: '.5rem' }}>⚡ Oferta Especial</div>
-                {selCombo?.isOffer && <span style={{ background: 'var(--red)', color: '#fff', fontSize: '.7rem', fontWeight: 700, padding: '.18rem .55rem', borderRadius: 6 }}>✔ Selected</span>}
-              </div>
+            <div style={{ background: 'linear-gradient(135deg,#1a1000,#1d0d00)', border: '1.5px solid rgba(255,198,51,.35)', borderRadius: 15, padding: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', fontSize: '.73rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '.28rem .75rem', borderRadius: 20, display: 'inline-block', marginBottom: '.5rem' }}>⚡ Oferta Especial</div>
               <h3 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '2.2rem', marginBottom: '.3rem' }}>{oferta.titulo}</h3>
               <p style={{ color: 'var(--gray)', fontSize: '.9rem', marginBottom: '.4rem' }} dangerouslySetInnerHTML={{ __html: oferta.descripcion }} />
               <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.3rem', color: 'var(--yellow)', marginBottom: '1rem' }}>${Number(oferta.precio).toFixed(2)} · {oferta.alitas} Alitas</div>
-              {!selCombo?.isOffer && <button className="btn btn-ghost btn-sm">+ Select Offer</button>}
             </div>
           )}
 

@@ -15,16 +15,11 @@ export default function Navbar() {
   const isAdmin = profile?.rol === 'admin'
 
   const handleLogout = async () => {
-    try {
-      logout() // Clear local state immediately for better UX
-      await supabase.auth.signOut()
-      showToast('info', '👋', 'Sesión cerrada', '¡Hasta pronto!')
-    } catch (e) {
-      console.error('Logout error:', e)
-    } finally {
-      navigate('/')
-      setDrawerOpen(false)
-    }
+    await supabase.auth.signOut()
+    logout()
+    showToast('info', '👋', 'Sesión cerrada', '¡Hasta pronto!')
+    navigate('/')
+    setDrawerOpen(false)
   }
 
   const openAuth = (tab = 'login') => {
@@ -49,52 +44,48 @@ export default function Navbar() {
         {/* Logo */}
         <div onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '.55rem', cursor: 'pointer', flexShrink: 0 }}>
           <div style={{ width: 34, height: 34, background: 'var(--red)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem' }}>🔥</div>
-          <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.4rem', letterSpacing: 2 }}>Portal de las Alitas</span>
+          <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.4rem', letterSpacing: 2 }} className="nav-logo-text">Portal de las Alitas</span>
         </div>
 
-        {/* Desktop links */}
-        <div style={{ display: 'flex', gap: '.15rem', flex: 1, justifyContent: 'center' }} className="nav-links-desktop hide-tablet-mobile">
-          <NavBtn onClick={() => navigate('/')} active={location.pathname === '/'}>Home</NavBtn>
-          {user && !isAdmin && <NavBtn onClick={() => navigate('/order')} active={location.pathname === '/order'}>Menú</NavBtn>}
-          {user && !isAdmin && <NavBtn onClick={() => navigate('/status')} active={location.pathname === '/status'}>Mis Pedidos</NavBtn>}
-          {isAdmin && <NavBtn onClick={() => navigate('/admin')} active={location.pathname === '/admin'}>Admin</NavBtn>}
+        {/* Desktop links — visibles siempre */}
+        <div style={{ display: 'flex', gap: '.15rem', flex: 1, justifyContent: 'center' }} className="nav-links-desktop">
+          <NavBtn onClick={() => navigate('/')} active={location.pathname === '/'}>🏠 Inicio</NavBtn>
+          {!isAdmin && <NavBtn onClick={() => user ? navigate('/order') : openAuth('login')} active={location.pathname === '/order'}>🍗 Menú</NavBtn>}
+          {user && !isAdmin && <NavBtn onClick={() => navigate('/status')} active={location.pathname === '/status'}>📦 Mis Pedidos</NavBtn>}
+          {isAdmin && <NavBtn onClick={() => navigate('/admin')} active={location.pathname === '/admin'}>👑 Admin</NavBtn>}
         </div>
 
         {/* Right section */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexShrink: 0 }}>
           {!user && (
-            <button className="btn-nav-cta hide-mobile" onClick={() => openAuth('login')} style={{
+            <button onClick={() => openAuth('login')} style={{
               background: 'var(--red)', color: '#fff', border: 'none', padding: '.45rem 1.1rem',
               borderRadius: 8, fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', whiteSpace: 'nowrap'
-            }}>Iniciar Sesión</button>
+            }} className="btn-nav-cta nav-login-btn">Iniciar Sesión</button>
           )}
           {user && !isAdmin && (
-            <button onClick={() => navigate('/order')} className="hide-mobile" style={{
+            <button onClick={() => navigate('/order')} style={{
               background: 'var(--red)', color: '#fff', border: 'none', padding: '.45rem 1.1rem',
               borderRadius: 8, fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', whiteSpace: 'nowrap'
-            }}>🛒 Pedir Ahora</button>
+            }} className="nav-order-btn">🛒 Pedir</button>
           )}
           {user && (
-            <div className="hide-mobile" style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--red),var(--orange))', border: '2px solid rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.92rem', fontWeight: 700, cursor: 'pointer', color: '#fff', fontFamily: "'Bebas Neue',cursive" }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--red),var(--orange))', border: '2px solid rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.92rem', fontWeight: 700, cursor: 'pointer', color: '#fff', fontFamily: "'Bebas Neue',cursive", flexShrink: 0 }}>
               {profile?.nombre?.[0]?.toUpperCase() || '?'}
             </div>
           )}
-          {/* Hamburger (Always visible) */}
-          <button onClick={() => setDrawerOpen(true)} style={{
-            background: 'none', border: 'none', color: 'var(--white)', cursor: 'pointer',
-            padding: '.25rem', width: 38, height: 38, borderRadius: 8, display: 'flex',
-            flexDirection: 'column', gap: 5, transition: 'background .2s',
-            alignItems: 'center', justifyContent: 'center'
-          }}>
-            <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
-            <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
+          {/* Hamburger — SIEMPRE visible */}
+          <button onClick={() => setDrawerOpen(true)} className="hamburger-btn">
+            <span /><span /><span />
           </button>
         </div>
       </nav>
 
+      {/* Overlay backdrop */}
+      {drawerOpen && <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1199, background: 'rgba(0,0,0,.4)' }} />}
+
       {/* Mobile Drawer */}
-      <div className={`mobile-drawer ${drawerOpen ? 'open' : ''}`} style={{ display: drawerOpen ? 'flex' : 'none' }}>
+      <div className={`mobile-drawer ${drawerOpen ? 'open' : ''}`}>
         <div className="drawer-header">
           <div onClick={() => go('/')} style={{ display: 'flex', alignItems: 'center', gap: '.55rem', cursor: 'pointer' }}>
             <div style={{ width: 34, height: 34, background: 'var(--red)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔥</div>
@@ -116,7 +107,11 @@ export default function Navbar() {
 
         <div className="drawer-nav">
           <button className="drawer-nav-link" onClick={() => go('/')}>🏠 &nbsp;Inicio</button>
-          {user && !isAdmin && <button className="drawer-nav-link" onClick={() => go('/order')}>🍗 &nbsp;Hacer Pedido</button>}
+          {!isAdmin && (
+            <button className="drawer-nav-link" onClick={() => { setDrawerOpen(false); user ? navigate('/order') : openAuth('login') }}>
+              🍗 &nbsp;Hacer Pedido
+            </button>
+          )}
           {user && !isAdmin && <button className="drawer-nav-link" onClick={() => go('/status')}>📦 &nbsp;Mis Pedidos</button>}
           {isAdmin && <button className="drawer-nav-link" style={{ color: 'var(--red)' }} onClick={() => go('/admin')}>👑 &nbsp;Panel Admin</button>}
         </div>
@@ -124,11 +119,15 @@ export default function Navbar() {
         <div className="drawer-bottom">
           {user
             ? <button className="drawer-logout" onClick={handleLogout}>👋 Cerrar Sesión</button>
-            : <button className="drawer-login-btn" onClick={() => openAuth('login')}>🔥 Iniciar Sesión</button>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                <button className="drawer-login-btn" onClick={() => openAuth('login')}>🔥 Iniciar Sesión</button>
+                <button onClick={() => openAuth('register')} style={{ background: 'rgba(255,255,255,.07)', color: 'var(--white)', border: '1px solid rgba(255,255,255,.12)', padding: '.7rem 1.2rem', borderRadius: 10, width: '100%', fontWeight: 600, cursor: 'pointer', fontSize: '1rem' }}>✨ Crear Cuenta</button>
+              </div>
+            )
           }
         </div>
       </div>
-      {drawerOpen && <div onClick={() => setDrawerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1199 }} />}
 
       {authOpen && <AuthModal tab={authTab} onClose={() => setAuthOpen(false)} />}
     </>
@@ -140,7 +139,8 @@ function NavBtn({ children, onClick, active }) {
     <button onClick={onClick} style={{
       background: active ? 'rgba(255,255,255,.07)' : 'none', border: 'none',
       color: active ? 'var(--white)' : 'var(--gray)', fontSize: '.88rem', fontWeight: 500,
-      padding: '.45rem .85rem', borderRadius: 8, cursor: 'pointer', transition: 'all .2s'
+      padding: '.45rem .85rem', borderRadius: 8, cursor: 'pointer', transition: 'all .2s',
+      whiteSpace: 'nowrap'
     }}>{children}</button>
   )
 }

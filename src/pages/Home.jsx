@@ -17,35 +17,17 @@ const SABORES = [
 export default function Home() {
   const [combos, setCombos] = useState([])
   const [oferta, setOferta] = useState(null)
-  const [bebidas, setBebidas] = useState([])
-  const [tiposArroz, setTiposArroz] = useState([])
   const [timer, setTimer] = useState({ h: '00', m: '00', s: '00' })
   const [authOpen, setAuthOpen] = useState(false)
-  const { user, profile } = useStore()
+  const { user } = useStore()
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Fetch combos
-    supabase.from('combos').select('*')
-      .then(({ data, error }) => {
-        if (error) console.error("Home: Error fetching combos:", error)
-        else setCombos(data || [])
-      })
-
-    // Fetch active offer
-    supabase.from('oferta').select('*').order('id', { ascending: false }).limit(1)
-      .then(({ data, error }) => {
-        if (error) console.error("Home: Error fetching offer:", error)
-        else if (data && data[0] && data[0].activa) setOferta(data[0])
-      })
-
-    // Fetch beverages
-    supabase.from('bebidas').select('*').eq('activa', true)
-      .then(({ data }) => setBebidas(data || []))
-
-    // Fetch rice types
-    supabase.from('tipos_arroz').select('*').eq('activo', true)
-      .then(({ data }) => setTiposArroz(data || []))
+    // Carga combos y ofertas SIN importar si hay sesión
+    supabase.from('combos').select('*').then(({ data }) => setCombos(data || []))
+    supabase.from('oferta').select('*').order('id', { ascending: false }).limit(1).then(({ data }) => {
+      if (data && data[0] && data[0].activa) setOferta(data[0])
+    })
   }, [])
 
   useEffect(() => {
@@ -61,6 +43,7 @@ export default function Home() {
     return () => clearInterval(t)
   }, [oferta])
 
+  // Si no está logueado → abre modal de login; si sí → va a /order
   const handleOrder = () => {
     if (!user) { setAuthOpen(true); return }
     navigate('/order')
@@ -71,8 +54,9 @@ export default function Home() {
       {/* HERO */}
       <section style={{
         minHeight: 'calc(100vh - var(--nav))', background: 'linear-gradient(135deg,#0e0e0e 0%,#1a0804 40%,#0e0e0e 100%)',
-        display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', padding: '4rem 5vw', gap: '2rem', position: 'relative', overflow: 'hidden'
-      }}>
+        display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', padding: '4rem 5vw', gap: '2rem',
+        position: 'relative', overflow: 'hidden'
+      }} className="hero-grid">
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 60% at 60% 50%,rgba(232,34,10,.12),transparent 70%)', pointerEvents: 'none' }} />
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'rgba(255,198,51,.12)', border: '1px solid rgba(255,198,51,.3)', color: 'var(--yellow)', fontSize: '.78rem', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '.3rem .85rem', borderRadius: 20, marginBottom: '1.5rem' }}>
@@ -96,11 +80,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* COMBOS */}
+      {/* COMBOS — visibles siempre */}
       <section style={{ padding: '5rem 5vw' }} id="sec-combos">
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <span className="section-tag">Nuestros Combos</span>
           <h2 className="section-title">Elige tu Favorito</h2>
+          {combos.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray)', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+              <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '.75rem' }}>🍗</span>
+              Pronto habrá combos disponibles
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: '1.2rem' }}>
             {combos.map(c => (
               <div key={c.id} onClick={c.estado !== 'agotado' ? handleOrder : undefined}
@@ -128,18 +118,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* OFERTA ESPECIAL */}
+      {/* OFERTA ESPECIAL — visible siempre si existe */}
       {oferta && (
         <section style={{ padding: '2rem 5vw' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <div style={{ background: 'linear-gradient(135deg,#1a1000,#1d0d00)', border: '1.5px solid rgba(255,198,51,.35)', borderRadius: 20, padding: '2.5rem', display: 'grid', gridTemplateColumns: '1fr auto', gap: '2rem', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ background: 'linear-gradient(135deg,#1a1000,#1d0d00)', border: '1.5px solid rgba(255,198,51,.35)', borderRadius: 20, padding: '2.5rem', display: 'grid', gap: '2rem', alignItems: 'center', position: 'relative', overflow: 'hidden' }} className="oferta-grid">
               <div style={{ position: 'absolute', right: '-1.5rem', top: '-1rem', fontSize: '10rem', opacity: .07, pointerEvents: 'none' }}>🔥</div>
               <div>
                 <div style={{ display: 'inline-flex', background: 'rgba(232,34,10,.2)', color: 'var(--red)', border: '1px solid rgba(232,34,10,.3)', fontSize: '.73rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', padding: '.28rem .75rem', borderRadius: 20, marginBottom: '.9rem' }}>⚡ Oferta de Tiempo Limitado</div>
                 <h2 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 'clamp(2.2rem,5vw,4rem)', letterSpacing: 2, marginBottom: '.4rem' }}>{oferta.titulo}</h2>
-                <p style={{ color: 'rgba(242,237,230,.6)', fontSize: '.93rem', marginBottom: '1rem' }} dangerouslySetInnerHTML={{ __html: oferta.descripcion }} />
+                <p style={{ color: 'rgba(242,237,230,.6)', fontSize: '.93rem', marginBottom: '1rem' }}>{oferta.descripcion}</p>
                 <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.6rem', color: 'var(--yellow)', marginBottom: '1rem' }}>${Number(oferta.precio).toFixed(2)} · {oferta.alitas} Alitas</div>
-                <div style={{ display: 'flex', gap: '.65rem', marginBottom: '1.4rem' }}>
+                <div style={{ display: 'flex', gap: '.65rem', marginBottom: '1.4rem', flexWrap: 'wrap' }}>
                   {[{ v: timer.h, l: 'Horas' }, { v: timer.m, l: 'Mins' }, { v: timer.s, l: 'Segs' }].map(({ v, l }) => (
                     <div key={l} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid var(--border)', borderRadius: 10, padding: '.55rem .85rem', textAlign: 'center', minWidth: 54 }}>
                       <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.9rem', lineHeight: 1, color: l === 'Segs' ? 'var(--red)' : 'var(--yellow)' }}>{v}</div>
@@ -147,10 +137,7 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-red" onClick={() => {
-                  useStore.getState().setSelOffer(oferta)
-                  handleOrder()
-                }}>🔥 Aprovechar Ahora</button>
+                <button className="btn btn-red" onClick={handleOrder}>🔥 Aprovechar Ahora</button>
               </div>
               <div style={{ fontSize: 'min(7rem,14vw)', textAlign: 'center' }}>{oferta.emoji}</div>
             </div>
@@ -165,49 +152,11 @@ export default function Home() {
           <h2 className="section-title">Nuestros Sabores</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.65rem', marginTop: '1.4rem' }}>
             {SALSAS.map(s => (
-              <div key={s} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', padding: '.45rem 1.1rem', borderRadius: 30, fontSize: '.86rem', transition: 'all .2s', cursor: 'default' }}>🫙 {s}</div>
+              <div key={s} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', padding: '.45rem 1.1rem', borderRadius: 30, fontSize: '.86rem', cursor: 'default' }}>🫙 {s}</div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* BEBIDAS */}
-      {bebidas.length > 0 && (
-        <section style={{ padding: '4rem 5vw' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <span className="section-tag">Bebidas</span>
-            <h2 className="section-title">Para Acompañar</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '1rem' }}>
-              {bebidas.map(b => (
-                <div key={b.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>{b.emoji}</div>
-                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginBottom: '.3rem' }}>{b.nombre}</div>
-                  <div style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(b.precio).toFixed(2)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ARROZ */}
-      {tiposArroz.length > 0 && (
-        <section style={{ padding: '4rem 5vw', background: 'var(--bg2)' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <span className="section-tag">Complementos</span>
-            <h2 className="section-title">Tipos de Arroz</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '1rem' }}>
-              {tiposArroz.map(a => (
-                <div key={a.id} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', textAlign: 'center' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>{a.emoji}</div>
-                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginBottom: '.3rem' }}>{a.nombre}</div>
-                  <div style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(a.precio).toFixed(2)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* SABORES */}
       <section style={{ padding: '4rem 5vw' }}>
@@ -216,7 +165,7 @@ export default function Home() {
           <h2 className="section-title">Variedad de Sabores</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(175px,1fr))', gap: '1rem', marginTop: '1.4rem' }}>
             {SABORES.map(s => (
-              <div key={s.name} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', textAlign: 'center', transition: 'all .25s' }}>
+              <div key={s.name} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', textAlign: 'center' }}>
                 <div style={{ fontSize: '1.9rem', marginBottom: '.4rem' }}>{s.icon}</div>
                 <div style={{ fontWeight: 600, fontSize: '.92rem', marginBottom: '.2rem' }}>{s.name}</div>
                 <div style={{ fontSize: '.76rem', color: 'var(--gray)' }}>{s.level}</div>
@@ -227,10 +176,10 @@ export default function Home() {
       </section>
 
       {/* FOOTER */}
-      <footer style={{ background: 'var(--bg2)', borderTop: '1px solid var(--border)', padding: '3rem 5vw', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '2rem', marginTop: '4rem' }}>
+      <footer style={{ background: 'var(--bg2)', borderTop: '1px solid var(--border)', padding: '3rem 5vw', marginTop: '4rem' }} className="footer-grid">
         <div>
           <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.75rem', letterSpacing: 2, marginBottom: '.4rem' }}>🔥 Portal de las Alitas</div>
-          <div style={{ color: 'var(--gray)', fontSize: '.86rem', maxWidth: 240, lineHeight: 1.6 }}>Redefiniendo el concepto de alitas con la mejor calidad desde 2024.</div>
+          <div style={{ color: 'var(--gray)', fontSize: '.86rem', maxWidth: 240, lineHeight: 1.6 }}>Redefiniendo el concepto de alitas con la mejor calidad.</div>
         </div>
         <div>
           <h4 style={{ fontWeight: 700, fontSize: '.82rem', letterSpacing: 1, textTransform: 'uppercase', color: 'var(--gray)', marginBottom: '.9rem' }}>Menú</h4>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
@@ -23,54 +23,32 @@ export default function Admin() {
   const lastCount = useRef(0)
   const [confirm, setConfirm] = useState(null)
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      // If we don't have a user, it's possible we are hydrating
-      if (!user) return
-
-      // If we have a user but no profile yet, wait for App.jsx to fetch it
-      if (!profile) return
-
-      // If we have a profile and it's not admin, redirect
-      if (profile.rol !== 'admin') {
-        navigate('/')
-        return
-      }
-
-      loadBadge()
-      const ch = supabase.channel('admin-realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => loadBadge())
-        .subscribe()
-
-      return () => {
-        supabase.removeChannel(ch)
-      }
-    }
-
-    const cleanup = checkAuth()
-    return () => { if (cleanup && typeof cleanup === 'function') cleanup() }
-  }, [user, profile])
-
-  if (!user || !profile) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', color: 'var(--gray)' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔒</div>
-          <p>Verificando credenciales...</p>
-        </div>
-      </div>
-    )
-  }
-
-  const loadBadge = async () => {
-    const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true }).in('estado', ['pendiente', 'preparacion', 'listo'])
+  const loadBadge = useCallback(async () => {
+    const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true })
+      .in('estado', ['pendiente', 'preparacion', 'listo'])
     const pending = count || 0
     if (pending > lastCount.current) {
-      playSound(); showToast('order', '🔔', `${pending - lastCount.current} nuevo(s) pedido(s)!`, 'Revisa el panel')
+      playSound()
+      showToast('order', '🔔', `${pending - lastCount.current} nuevo(s) pedido(s)!`, 'Revisa el panel')
     }
     lastCount.current = pending
     setPedidosActivos(pending)
-  }
+  }, [showToast])
+
+  useEffect(() => {
+    if (!user || profile?.rol !== 'admin') { navigate('/'); return }
+    loadBadge()
+    // Suscripción realtime para nuevos pedidos
+    const ch = supabase.channel('admin-badge')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, () => {
+        loadBadge()
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, () => {
+        loadBadge()
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [user, profile, loadBadge, navigate])
 
   const playSound = () => {
     try {
@@ -121,45 +99,46 @@ function TabPedidos({ showToast, confirm, onBadge }) {
   const [salsasMap, setSalsasMap] = useState({})
   const [extrasMap, setExtrasMap] = useState({})
   const [tiposArroz, setTiposArroz] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const load = async () => {
-    try {
-      const [p, c, u, a] = await Promise.all([
-        supabase.from('pedidos').select('id, created_at, usuario_id, combo_id, combo_precio, total, tipo, mesa, direccion, mensaje, estado, arroz, adicional, es_extra, tipo_extra').not('estado', 'in', '("completado","eliminado")').order('created_at', { ascending: true }),
-        supabase.from('combos').select('id, nombre, emoji, alitas'),
-        supabase.from('profiles').select('id, nombre, email'),
-        supabase.from('tipos_arroz').select('id, nombre, emoji'),
+  const load = useCallback(async () => {
+    const [p, c, u, a] = await Promise.all([
+      // ORDEN CRONOLÓGICO: los más antiguos primero (ascending = true)
+      supabase.from('pedidos').select('*').not('estado', 'in', '(completado,eliminado)').order('created_at', { ascending: true }),
+      supabase.from('combos').select('*'),
+      supabase.from('profiles').select('*'),
+      supabase.from('tipos_arroz').select('*'),
+    ])
+    const allP = p.data || []
+    setPedidos(allP); setCombos(c.data || []); setUsers(u.data || []); setTiposArroz(a.data || [])
+    if (allP.length) {
+      const ids = allP.map(x => x.id)
+      const [s, e] = await Promise.all([
+        supabase.from('pedido_salsas').select('*').in('pedido_id', ids),
+        supabase.from('pedido_extras').select('*').in('pedido_id', ids)
       ])
-
-      if (p.error) throw p.error
-      if (c.error) throw c.error
-      if (u.error) throw u.error
-      if (a.error) throw a.error
-
-      const allP = p.data || []
-      setPedidos(allP); setCombos(c.data || []); setUsers(u.data || []); setTiposArroz(a.data || [])
-
-      if (allP.length) {
-        const ids = allP.map(x => x.id)
-        const [s, e] = await Promise.all([
-          supabase.from('pedido_salsas').select('pedido_id, tipo_salsa, cantidad').in('pedido_id', ids),
-          supabase.from('pedido_extras').select('pedido_id, nombre, cantidad, precio, tipo').in('pedido_id', ids)
-        ])
-        const sm = {}; (s.data || []).forEach(x => { if (!sm[x.pedido_id]) sm[x.pedido_id] = []; sm[x.pedido_id].push(x) })
-        const em = {}; (e.data || []).forEach(x => { if (!em[x.pedido_id]) em[x.pedido_id] = []; em[x.pedido_id].push(x) })
-        setSalsasMap(sm); setExtrasMap(em)
-      }
-    } catch (err) {
-      console.error("Admin: Error loading data:", err)
-      showToast('error', '⚠️', 'Error al cargar pedidos', err.message)
+      const sm = {}; (s.data || []).forEach(x => { if (!sm[x.pedido_id]) sm[x.pedido_id] = []; sm[x.pedido_id].push(x) })
+      const em = {}; (e.data || []).forEach(x => { if (!em[x.pedido_id]) em[x.pedido_id] = []; em[x.pedido_id].push(x) })
+      setSalsasMap(sm); setExtrasMap(em)
     }
-  }
+    setLoading(false)
+  }, [])
 
-  useEffect(() => { load(); const iv = setInterval(load, 5000); return () => clearInterval(iv) }, [])
+  useEffect(() => {
+    load()
+    // Realtime: actualizar instantáneamente cuando llega un pedido nuevo
+    const ch = supabase.channel('pedidos-tab')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => load())
+      .subscribe()
+    // Polling cada 5s como respaldo
+    const iv = setInterval(load, 5000)
+    return () => { supabase.removeChannel(ch); clearInterval(iv) }
+  }, [load])
 
   const updateEstado = async (id, estado) => {
     await supabase.from('pedidos').update({ estado }).eq('id', id)
-    load(); onBadge(); showToast('info', '🔄', 'Estado actualizado', '')
+    load(); onBadge()
+    showToast('info', '🔄', 'Estado actualizado', '')
   }
 
   const locales = pedidos.filter(p => p.tipo !== 'domicilio')
@@ -168,17 +147,20 @@ function TabPedidos({ showToast, confirm, onBadge }) {
 
   const renderPedido = (p) => {
     const u = users.find(x => x.id === p.usuario_id)
-    const combo = combos.find(c => c.id === p.combo_id)
+    const horaTexto = new Date(p.created_at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
     return (
       <div key={p.id} style={{ marginBottom: '.7rem' }}>
         <StatusCard pedido={p} salsas={salsasMap[p.id] || []} extras={extrasMap[p.id] || []} combos={combos} tiposArroz={tiposArroz} />
         <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '0 0 var(--radius) var(--radius)', padding: '.75rem 1rem', marginTop: -8 }}>
-          <div style={{ fontSize: '.82rem', color: 'var(--gray)', marginBottom: '.5rem' }}>👤 {u?.nombre || '?'} ({u?.email || ''})</div>
+          <div style={{ fontSize: '.82rem', color: 'var(--gray)', marginBottom: '.5rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.3rem' }}>
+            <span>👤 {u?.nombre || '?'} ({u?.email || ''})</span>
+            <span style={{ color: 'rgba(255,198,51,.7)', fontWeight: 600 }}>🕐 {horaTexto}</span>
+          </div>
           <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
             <select className="pc-estado-select" value={p.estado} onChange={e => updateEstado(p.id, e.target.value)} style={{ flex: 1 }}>
               {['pendiente', 'preparacion', 'listo'].map(e => <option key={e} value={e}>{eLabel[e]}</option>)}
             </select>
-            <button className="btn btn-success btn-sm" onClick={() => updateEstado(p.id, 'completado')}>✅ Completar</button>
+            <button className="btn btn-success btn-sm" onClick={() => updateEstado(p.id, 'completado')}>✅ Listo</button>
             <button className="btn btn-danger btn-sm" onClick={() => confirm({ msg: '¿Cancelar este pedido?', onConfirm: () => updateEstado(p.id, 'eliminado') })}>❌</button>
           </div>
         </div>
@@ -188,19 +170,32 @@ function TabPedidos({ showToast, confirm, onBadge }) {
 
   return (
     <>
-      <h2>📋 Pedidos Activos</h2>
-      <button className="btn btn-ghost btn-sm" style={{ marginBottom: '1rem' }} onClick={load}>🔄 Actualizar</button>
-      {pedidos.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray)' }}>No hay pedidos activos 🎉</div>}
-      <div className="pedidos-cols">
-        <div>
-          <div className="pedidos-col-title local">🍽 Local / Llevar ({locales.length})</div>
-          {locales.length === 0 ? <div style={{ color: 'var(--gray)', fontSize: '.85rem' }}>Sin pedidos locales</div> : locales.map(renderPedido)}
-        </div>
-        <div>
-          <div className="pedidos-col-title delivery">🛵 Domicilios ({domicilios.length})</div>
-          {domicilios.length === 0 ? <div style={{ color: 'var(--gray)', fontSize: '.85rem' }}>Sin pedidos a domicilio</div> : domicilios.map(renderPedido)}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
+        <h2 style={{ margin: 0 }}>📋 Pedidos Activos</h2>
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '.75rem', color: 'var(--gray)' }}>● Actualización automática</span>
+          <button className="btn btn-ghost btn-sm" onClick={load}>🔄 Actualizar</button>
         </div>
       </div>
+      {loading && <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray)' }}>Cargando pedidos...</div>}
+      {!loading && pedidos.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--gray)', background: 'var(--bg3)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+          <span style={{ fontSize: '3rem', display: 'block', marginBottom: '.75rem' }}>🎉</span>
+          No hay pedidos activos
+        </div>
+      )}
+      {!loading && (
+        <div className="pedidos-cols">
+          <div>
+            <div className="pedidos-col-title local">🍽 Local / Llevar ({locales.length})</div>
+            {locales.length === 0 ? <div style={{ color: 'var(--gray)', fontSize: '.85rem' }}>Sin pedidos locales</div> : locales.map(renderPedido)}
+          </div>
+          <div>
+            <div className="pedidos-col-title delivery">🛵 Domicilios ({domicilios.length})</div>
+            {domicilios.length === 0 ? <div style={{ color: 'var(--gray)', fontSize: '.85rem' }}>Sin pedidos a domicilio</div> : domicilios.map(renderPedido)}
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -209,44 +204,23 @@ function TabPedidos({ showToast, confirm, onBadge }) {
 function TabUsuarios() {
   const [users, setUsers] = useState([])
   const [pedidos, setPedidos] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const load = async () => {
-    setLoading(true)
-    try {
-      const [u, p] = await Promise.all([
-        supabase.from('profiles').select('*'),
-        supabase.from('pedidos').select('id, usuario_id')
-      ])
-      setUsers(u.data || [])
-      setPedidos(p.data || [])
-    } catch (err) {
-      console.error("Error loading users:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [])
-
+  useEffect(() => {
+    supabase.from('profiles').select('*').then(r => setUsers(r.data || []))
+    supabase.from('pedidos').select('id, usuario_id').then(r => setPedidos(r.data || []))
+  }, [])
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.4rem' }}>
-        <h2>👥 Usuarios</h2>
-        <button className="btn btn-ghost btn-sm" onClick={load}>🔄 Refresh</button>
-      </div>
-      {loading ? <p>Cargando usuarios...</p> : (
-        <table className="a-table">
-          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Pedidos</th></tr></thead>
-          <tbody>{users.map(u => (
-            <tr key={u.id}>
-              <td>{u.nombre}</td><td>{u.email}</td>
-              <td><span className={`sb-status ${u.rol === 'admin' ? 'st-listo' : 'st-pendiente'}`}>{u.rol}</span></td>
-              <td>{pedidos.filter(p => p.usuario_id === u.id).length}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      )}
+      <h2>👥 Usuarios</h2>
+      <table className="a-table">
+        <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Pedidos</th></tr></thead>
+        <tbody>{users.map(u => (
+          <tr key={u.id}>
+            <td>{u.nombre}</td><td>{u.email}</td>
+            <td><span className={`sb-status ${u.rol === 'admin' ? 'st-listo' : 'st-pendiente'}`}>{u.rol}</span></td>
+            <td>{pedidos.filter(p => p.usuario_id === u.id).length}</td>
+          </tr>
+        ))}</tbody>
+      </table>
     </>
   )
 }
@@ -254,27 +228,17 @@ function TabUsuarios() {
 // ─── TAB COMBOS ───
 function TabCombos({ showToast, confirm }) {
   const [combos, setCombos] = useState([])
-  const [form, setForm] = useState({ id: '', nombre: '', precio: '', alitas: '', descripcion: '' })
+  const [form, setForm] = useState({ id: '', nombre: '', precio: '', alitas: '', descripcion: '', emoji: '🍗' })
   const load = () => supabase.from('combos').select('*').then(r => setCombos(r.data || []))
   useEffect(() => { load() }, [])
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const save = async () => {
     if (!form.nombre || !form.precio || !form.alitas) { showToast('error', '⚠️', 'Error', 'Completa todos los campos.'); return }
-    try {
-      if (form.id) {
-        const { error } = await supabase.from('combos').update({ nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion }).eq('id', form.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from('combos').insert({ nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion, estado: 'disponible', es_jueves: false, emoji: '🍗' })
-        if (error) throw error
-      }
-      setForm({ id: '', nombre: '', precio: '', alitas: '', descripcion: '' })
-      await load()
-      showToast('success', '✅', 'Combo guardado', '')
-    } catch (err) {
-      console.error("Error saving combo:", err)
-      showToast('error', '⚠️', 'Error al guardar', err.message)
-    }
+    const d = { nombre: form.nombre, precio: Number(form.precio), alitas: Number(form.alitas), descripcion: form.descripcion, emoji: form.emoji || '🍗' }
+    if (form.id) { await supabase.from('combos').update(d).eq('id', form.id) }
+    else { await supabase.from('combos').insert({ ...d, estado: 'disponible', es_jueves: false }) }
+    setForm({ id: '', nombre: '', precio: '', alitas: '', descripcion: '', emoji: '🍗' }); load()
+    showToast('success', '✅', 'Combo guardado', '')
   }
   const toggleAgotado = async (c) => { await supabase.from('combos').update({ estado: c.estado === 'agotado' ? 'disponible' : 'agotado' }).eq('id', c.id); load() }
   const del = (id) => confirm({ msg: '¿Eliminar este combo?', onConfirm: async () => { await supabase.from('combos').delete().eq('id', id); load(); showToast('success', '🗑', 'Eliminado', '') } })
@@ -288,12 +252,13 @@ function TabCombos({ showToast, confirm }) {
           <div className="form-group"><label>Precio ($)</label><input type="number" value={form.precio} onChange={f('precio')} step="0.5" /></div>
         </div>
         <div className="form-row">
-          <div className="form-group"><label>Alitas</label><input type="number" value={form.alitas} onChange={f('alitas')} /></div>
-          <div className="form-group"><label>Descripción</label><input value={form.descripcion} onChange={f('descripcion')} /></div>
+          <div className="form-group"><label>Nº Alitas</label><input type="number" value={form.alitas} onChange={f('alitas')} /></div>
+          <div className="form-group"><label>Emoji</label><input value={form.emoji} onChange={f('emoji')} placeholder="🍗" maxLength={4} /></div>
         </div>
+        <div className="form-group"><label>Descripción</label><input value={form.descripcion} onChange={f('descripcion')} placeholder="Descripción del combo..." /></div>
         <div style={{ display: 'flex', gap: '.65rem' }}>
           <button className="btn btn-red btn-sm" onClick={save}>💾 Guardar</button>
-          {form.id && <button className="btn btn-ghost btn-sm" onClick={() => setForm({ id: '', nombre: '', precio: '', alitas: '', descripcion: '' })}>Cancelar</button>}
+          {form.id && <button className="btn btn-ghost btn-sm" onClick={() => setForm({ id: '', nombre: '', precio: '', alitas: '', descripcion: '', emoji: '🍗' })}>Cancelar</button>}
         </div>
       </div>
       <div className="items-grid">
@@ -303,7 +268,7 @@ function TabCombos({ showToast, confirm }) {
             <p>${Number(c.precio).toFixed(2)} · {c.alitas} alitas<br />{c.descripcion}</p>
             <p>Estado: <span className={`sb-status ${c.estado === 'agotado' ? 'st-eliminado' : 'st-listo'}`}>{c.estado}</span></p>
             <div className="item-admin-actions">
-              <button className="btn btn-outline btn-sm" onClick={() => setForm({ id: c.id, nombre: c.nombre, precio: c.precio, alitas: c.alitas, descripcion: c.descripcion })}>✏</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setForm({ id: c.id, nombre: c.nombre, precio: c.precio, alitas: c.alitas, descripcion: c.descripcion, emoji: c.emoji || '🍗' })}>✏</button>
               <button className={`btn btn-sm ${c.estado === 'agotado' ? 'btn-success' : 'btn-danger'}`} onClick={() => toggleAgotado(c)}>{c.estado === 'agotado' ? '✅ Activar' : '🚫 Agotado'}</button>
               <button className="btn btn-danger btn-sm" onClick={() => del(c.id)}>🗑</button>
             </div>
@@ -323,22 +288,11 @@ function TabBebidas({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const save = async () => {
     if (!form.nombre || !form.precio) { showToast('error', '⚠️', 'Error', 'Completa nombre y precio.'); return }
-    try {
-      const d = { nombre: form.nombre, precio: Number(form.precio), tipo: form.tipo, emoji: form.emoji || '🥤' }
-      if (form.id) {
-        const { error } = await supabase.from('bebidas').update(d).eq('id', form.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from('bebidas').insert({ ...d, activa: true })
-        if (error) throw error
-      }
-      setForm({ id: '', nombre: '', precio: '', tipo: 'normal', emoji: '' })
-      await load()
-      showToast('success', '✅', 'Bebida guardada', '')
-    } catch (err) {
-      console.error("Error saving bebida:", err)
-      showToast('error', '⚠️', 'Error al guardar', err.message)
-    }
+    const d = { nombre: form.nombre, precio: Number(form.precio), tipo: form.tipo, emoji: form.emoji || '🥤' }
+    if (form.id) { await supabase.from('bebidas').update(d).eq('id', form.id) }
+    else { await supabase.from('bebidas').insert({ ...d, activa: true }) }
+    setForm({ id: '', nombre: '', precio: '', tipo: 'normal', emoji: '' }); load()
+    showToast('success', '✅', 'Bebida guardada', '')
   }
   const toggle = async (b) => { await supabase.from('bebidas').update({ activa: !b.activa }).eq('id', b.id); load() }
   const del = (id) => confirm({ msg: '¿Eliminar esta bebida?', onConfirm: async () => { await supabase.from('bebidas').delete().eq('id', id); load() } })
@@ -392,29 +346,17 @@ function TabArroz({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const save = async () => {
     if (!form.nombre) { showToast('error', '⚠️', 'Error', 'Ingresa el nombre.'); return }
-    try {
-      const d = { nombre: form.nombre, emoji: form.emoji || '🍚', precio: Number(form.precio) || 1 }
-      if (form.id) {
-        const { error } = await supabase.from('tipos_arroz').update(d).eq('id', form.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from('tipos_arroz').insert({ ...d, activo: true })
-        if (error) throw error
-      }
-      setForm({ id: '', nombre: '', emoji: '', precio: '1.00' })
-      await load()
-      showToast('success', '✅', 'Tipo de arroz guardado', '')
-    } catch (err) {
-      console.error("Error saving arroz:", err)
-      showToast('error', '⚠️', 'Error al guardar', err.message)
-    }
+    const d = { nombre: form.nombre, emoji: form.emoji || '🍚', precio: Number(form.precio) || 1 }
+    if (form.id) { await supabase.from('tipos_arroz').update(d).eq('id', form.id) }
+    else { await supabase.from('tipos_arroz').insert({ ...d, activo: true }) }
+    setForm({ id: '', nombre: '', emoji: '', precio: '1.00' }); load()
+    showToast('success', '✅', 'Tipo de arroz guardado', '')
   }
   const toggle = async (t) => { await supabase.from('tipos_arroz').update({ activo: !t.activo }).eq('id', t.id); load() }
   const del = (id) => confirm({ msg: '¿Eliminar este tipo de arroz?', onConfirm: async () => { await supabase.from('tipos_arroz').delete().eq('id', id); load() } })
   return (
     <>
       <h2>🍚 Gestión de Arroz</h2>
-      <p style={{ color: 'var(--gray)', fontSize: '.85rem', marginBottom: '1.2rem' }}>Administra los tipos de arroz disponibles.</p>
       <div className="admin-form-card">
         <h3 style={{ fontWeight: 700, marginBottom: '.9rem' }}>{form.id ? '✏ Editar' : '➕ Agregar'} Tipo</h3>
         <div className="form-row">
@@ -455,17 +397,10 @@ function TabOferta({ showToast, confirm }) {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const crear = async () => {
     if (!form.titulo || !form.descripcion || !form.precio || !form.alitas) { showToast('error', '⚠️', 'Error', 'Completa todos los campos.'); return }
-    try {
-      const fecha_fin = new Date(Date.now() + Number(form.horas) * 3600000).toISOString()
-      const { error } = await supabase.from('oferta').insert({ titulo: form.titulo, descripcion: form.descripcion, precio: Number(form.precio), alitas: Number(form.alitas), emoji: form.emoji || '🔥', fecha_fin, activa: true })
-      if (error) throw error
-      setForm({ titulo: '', descripcion: '', precio: '', alitas: '', emoji: '🔥', horas: '24' })
-      await load()
-      showToast('success', '⚡', '¡Oferta publicada!', '')
-    } catch (err) {
-      console.error("Error creating oferta:", err)
-      showToast('error', '⚠️', 'Error al publicar', err.message)
-    }
+    const fecha_fin = new Date(Date.now() + Number(form.horas) * 3600000).toISOString()
+    await supabase.from('oferta').insert({ titulo: form.titulo, descripcion: form.descripcion, precio: Number(form.precio), alitas: Number(form.alitas), emoji: form.emoji || '🔥', fecha_fin, activa: true })
+    setForm({ titulo: '', descripcion: '', precio: '', alitas: '', emoji: '🔥', horas: '24' }); load()
+    showToast('success', '⚡', '¡Oferta publicada!', '')
   }
   const toggleEstado = async () => { await supabase.from('oferta').update({ activa: !oferta.activa }).eq('id', oferta.id); load() }
   const eliminar = () => confirm({ msg: '¿Eliminar la oferta especial?', onConfirm: async () => { await supabase.from('oferta').delete().eq('id', oferta.id); load(); showToast('success', '🗑', 'Oferta eliminada', '') } })
@@ -501,10 +436,11 @@ function TabOferta({ showToast, confirm }) {
   )
 }
 
-// ─── TAB STATS ───
+// ─── TAB STATS (con descuento automático de inventario) ───
 function TabStats({ showToast, confirm }) {
   const [stats, setStats] = useState(null)
   const [inv, setInv] = useState({})
+  const [invInputs, setInvInputs] = useState({})
   const [bebidas, setBebidas] = useState([])
 
   const load = async () => {
@@ -520,21 +456,31 @@ function TabStats({ showToast, confirm }) {
     setBebidas(allB)
     const invObj = {}; (i.data || []).forEach(x => invObj[x.clave] = x.valor)
     setInv(invObj)
+
+    // Calcular alitas usadas en pedidos activos (no completados/eliminados)
+    const pedidosActivos = allP.filter(x => !['completado', 'eliminado'].includes(x.estado))
+    const alitasUsadas = allP.reduce((a, pd) => {
+      const co = allC.find(c => c.id === pd.combo_id)
+      return a + (co ? co.alitas : 0)
+    }, 0)
+
     const hoy = new Date().toDateString()
     const hoyP = allP.filter(x => new Date(x.created_at).toDateString() === hoy)
-    const totalRev = allP.reduce((a, p) => a + Number(p.total || 0), 0)
-    const totalAlitas = allP.reduce((a, p) => { const co = allC.find(c => c.id === p.combo_id); return a + (co ? co.alitas : 0) }, 0)
-    const bebNormal = allPE.filter(e => { const b = allB.find(x => x.nombre === e.nombre); return b?.tipo === 'normal' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
-    const bebAlcohol = allPE.filter(e => { const b = allB.find(x => x.nombre === e.nombre); return b?.tipo === 'alcohol' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
-    setStats({ hoyP: hoyP.length, total: allP.length, usuarios: allU.length, pendientes: allP.filter(x => x.estado === 'pendiente').length, domicilios: allP.filter(x => x.tipo === 'domicilio').length, totalRev, totalAlitas, bebNormal, bebAlcohol })
+    const totalRev = allP.reduce((a, pd) => a + Number(pd.total || 0), 0)
+    const bebNormal = allPE.filter(e => { const bv = allB.find(x => x.nombre === e.nombre); return bv?.tipo === 'normal' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
+    const bebAlcohol = allPE.filter(e => { const bv = allB.find(x => x.nombre === e.nombre); return bv?.tipo === 'alcohol' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
+    setStats({ hoyP: hoyP.length, total: allP.length, usuarios: allU.length, pendientes: allP.filter(x => x.estado === 'pendiente').length, domicilios: allP.filter(x => x.tipo === 'domicilio').length, totalRev, alitasUsadas, bebNormal, bebAlcohol })
   }
 
   useEffect(() => { load() }, [])
 
-  const saveInv = async (clave, valor) => {
-    const el = document.getElementById('inv-' + clave)
-    if (!el) return
-    const v = parseInt(el.value)
+  // Calcular alitas disponibles descontando las usadas
+  const alitasTotal = inv['alitas'] ?? null
+  const alitasDisponibles = alitasTotal !== null && stats ? Math.max(0, alitasTotal - stats.alitasUsadas) : null
+  const alitasBajas = alitasDisponibles !== null && alitasDisponibles <= 10
+
+  const saveInv = async (clave) => {
+    const v = parseInt(invInputs[clave] ?? inv[clave] ?? '')
     if (isNaN(v) || v < 0) { showToast('error', '⚠️', 'Error', 'Número inválido'); return }
     await supabase.from('inventario').upsert({ clave, valor: v }, { onConflict: 'clave' })
     showToast('success', '✅', 'Inventario guardado', `${clave}: ${v}`)
@@ -542,9 +488,7 @@ function TabStats({ showToast, confirm }) {
   }
 
   const saveInvBeb = async (b) => {
-    const el = document.getElementById('inv-beb-' + b.id)
-    if (!el) return
-    const v = parseInt(el.value)
+    const v = parseInt(invInputs['beb_' + b.id] ?? inv['beb_' + b.id] ?? '')
     if (isNaN(v) || v < 0) { showToast('error', '⚠️', 'Error', 'Número inválido'); return }
     await supabase.from('inventario').upsert({ clave: 'beb_' + b.id, valor: v }, { onConflict: 'clave' })
     showToast('success', '✅', 'Stock guardado', `${b.nombre}: ${v}`)
@@ -566,29 +510,79 @@ function TabStats({ showToast, confirm }) {
       {/* INVENTARIO */}
       <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.75rem' }}>📦 Control de Inventario</div>
       <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.2rem', marginBottom: '1.4rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-          {[['alitas', '🍗 Alitas'], ['arroz', '🍚 Arroz']].map(([k, label]) => (
-            <div key={k}>
-              <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.5rem' }}>{label}</div>
-              <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <input type="number" id={`inv-${k}`} defaultValue={inv[k] ?? ''} placeholder="Cantidad" min="0" style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.45rem .7rem', borderRadius: 8, fontSize: '.88rem', outline: 'none', width: 130 }} />
-                <button className="btn btn-success btn-sm" onClick={() => saveInv(k, 0)}>💾 Guardar</button>
+
+        {/* ALITAS — con descuento automático */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.5rem' }}>🍗 Stock de Alitas</div>
+          <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="number" placeholder="Total alitas" min="0"
+              value={invInputs['alitas'] ?? (inv['alitas'] !== undefined ? inv['alitas'] : '')}
+              onChange={e => setInvInputs(p => ({ ...p, alitas: e.target.value }))}
+              style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.45rem .7rem', borderRadius: 8, fontSize: '.88rem', outline: 'none', width: 130 }}
+            />
+            <button className="btn btn-success btn-sm" onClick={() => saveInv('alitas')}>💾 Guardar</button>
+          </div>
+          {/* Mostrar disponibles calculados */}
+          {alitasTotal !== null && (
+            <div style={{ marginTop: '.65rem', display: 'flex', gap: '1.2rem', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '.78rem', color: 'var(--gray)' }}>Total ingresado: <strong style={{ color: 'var(--white)' }}>{alitasTotal}</strong></div>
+              <div style={{ fontSize: '.78rem', color: 'var(--gray)' }}>Usadas en pedidos: <strong style={{ color: 'var(--yellow)' }}>{stats.alitasUsadas}</strong></div>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: alitasBajas ? '#f87171' : '#4ade80' }}>
+                {alitasBajas ? '⚠️' : '✅'} Disponibles: {alitasDisponibles}
+                {alitasDisponibles === 0 && ' — ¡SIN STOCK!'}
+                {alitasDisponibles > 0 && alitasBajas && ' — ¡Pocas alitas!'}
               </div>
-              {inv[k] !== undefined && <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: inv[k] <= 0 ? '#f87171' : 'var(--green)' }}>Disponibles: {inv[k]}{inv[k] <= 0 && ' ⚠ ¡Sin stock!'}</div>}
             </div>
-          ))}
+          )}
+          {/* Alerta visual si hay pocas */}
+          {alitasBajas && (
+            <div style={{ marginTop: '.6rem', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 9, padding: '.55rem .9rem', fontSize: '.82rem', color: '#f87171', fontWeight: 600 }}>
+              🚨 {alitasDisponibles === 0 ? '¡Sin alitas disponibles! Repón el inventario.' : `Solo quedan ${alitasDisponibles} alitas. Considera reponer pronto.`}
+            </div>
+          )}
         </div>
+
+        {/* ARROZ */}
+        <div style={{ marginBottom: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.5rem' }}>🍚 Stock de Arroz</div>
+          <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="number" placeholder="Porciones" min="0"
+              value={invInputs['arroz'] ?? (inv['arroz'] !== undefined ? inv['arroz'] : '')}
+              onChange={e => setInvInputs(p => ({ ...p, arroz: e.target.value }))}
+              style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.45rem .7rem', borderRadius: 8, fontSize: '.88rem', outline: 'none', width: 130 }}
+            />
+            <button className="btn btn-success btn-sm" onClick={() => saveInv('arroz')}>💾 Guardar</button>
+          </div>
+          {inv['arroz'] !== undefined && (
+            <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: inv['arroz'] <= 0 ? '#f87171' : '#4ade80' }}>
+              {inv['arroz'] <= 0 ? '⚠️ ¡Sin stock de arroz!' : `✅ Stock: ${inv['arroz']} porciones`}
+            </div>
+          )}
+        </div>
+
+        {/* BEBIDAS */}
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
           <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.65rem' }}>🥤 Control de Bebidas</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: '.65rem' }}>
             {bebidas.map(b => (
-              <div key={b.id} style={{ background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 9, padding: '.75rem' }}>
+              <div key={b.id} style={{ background: 'var(--bg4)', border: `1px solid ${(inv['beb_' + b.id] ?? 1) <= 0 ? 'rgba(239,68,68,.4)' : 'var(--border)'}`, borderRadius: 9, padding: '.75rem' }}>
                 <div style={{ fontSize: '.82rem', fontWeight: 600, marginBottom: '.4rem' }}>{b.emoji} {b.nombre}</div>
                 <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.4rem', alignItems: 'center' }}>
-                  <input type="number" id={`inv-beb-${b.id}`} defaultValue={inv['beb_' + b.id] ?? ''} placeholder="Stock" min="0" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.3rem .5rem', borderRadius: 6, fontSize: '.78rem', outline: 'none', width: 75 }} />
+                  <input
+                    type="number" placeholder="Stock" min="0"
+                    value={invInputs['beb_' + b.id] ?? (inv['beb_' + b.id] !== undefined ? inv['beb_' + b.id] : '')}
+                    onChange={e => setInvInputs(p => ({ ...p, ['beb_' + b.id]: e.target.value }))}
+                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.3rem .5rem', borderRadius: 6, fontSize: '.78rem', outline: 'none', width: 75 }}
+                  />
                   <button className="btn btn-success btn-sm" style={{ padding: '.28rem .55rem', fontSize: '.72rem' }} onClick={() => saveInvBeb(b)}>💾</button>
                 </div>
-                {inv['beb_' + b.id] !== undefined && <div style={{ fontSize: '.73rem', color: inv['beb_' + b.id] <= 0 ? '#f87171' : 'var(--green)' }}>Stock: {inv['beb_' + b.id]}</div>}
+                {inv['beb_' + b.id] !== undefined && (
+                  <div style={{ fontSize: '.73rem', color: inv['beb_' + b.id] <= 0 ? '#f87171' : '#4ade80', fontWeight: 600 }}>
+                    {inv['beb_' + b.id] <= 0 ? '⚠️ Sin stock' : `✅ ${inv['beb_' + b.id]} uds`}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -604,7 +598,7 @@ function TabStats({ showToast, confirm }) {
       <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.7rem', marginTop: '1.2rem' }}>💰 Totales</div>
       <div className="totales-grid">
         <div className="totales-card hl"><h4>💵 Ingreso Total</h4><div className="tot-val">${stats.totalRev.toFixed(2)}</div></div>
-        <div className="totales-card"><h4>🐔 Alitas Vendidas</h4><div className="tot-val">{stats.totalAlitas}</div></div>
+        <div className="totales-card"><h4>🐔 Alitas Vendidas</h4><div className="tot-val">{stats.alitasUsadas}</div></div>
         <div className="totales-card"><h4>🥤 Bebidas S/Alcohol</h4><div className="tot-val">${stats.bebNormal.toFixed(2)}</div></div>
         <div className="totales-card"><h4>🍺 Alcohólicas</h4><div className="tot-val">${stats.bebAlcohol.toFixed(2)}</div></div>
       </div>

@@ -17,25 +17,13 @@ export default function Status() {
   const [confirm, setConfirm] = useState(null)
 
   useEffect(() => {
-    if (!user) return
+    if (!user) { navigate('/'); return }
     loadData()
     // Realtime
     const ch = supabase.channel('status-updates').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `usuario_id=eq.${user.id}` }, () => loadData()).subscribe()
     const interval = setInterval(loadData, 5000)
     return () => { supabase.removeChannel(ch); clearInterval(interval) }
   }, [user])
-
-  if (!user && !localStorage.getItem('portal-alitas-storage')) {
-    return <Navigate to="/" replace />
-  }
-
-  if (!user) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', color: 'var(--gray)' }}>
-        <p>Verificando sesión...</p>
-      </div>
-    )
-  }
 
   const loadData = async () => {
     const [pRes, cRes, aRes] = await Promise.all([
