@@ -101,7 +101,13 @@ export default function Order() {
       direccion: tipoServicio === 'domicilio' ? direccion : '',
       mensaje: finalMensaje,
       estado: 'pendiente',
-      arroz: arrozSnapshot
+      arroz: arrozSnapshot,
+      adicional: {
+        arroz: 0,
+        bebidas: 0,
+        items: [],
+        alitas: selCombo.alitas || 0 // ← Snapshot para inventario
+      }
     }).select().single()
     if (error) { showToast('error', '⚠️', 'Error', error.message); return }
 
@@ -191,7 +197,7 @@ export default function Order() {
         {/* LEFT */}
         <div style={{ padding: '2rem 2rem 4rem 2.5rem' }}>
           <div style={{ marginBottom: '1.5rem' }}>
-            <h1 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '2.4rem', letterSpacing: 1, marginBottom: '.2rem' }}>Place Your Order</h1>
+            <h1 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '2.4rem', letterSpacing: 1, marginBottom: '.2rem' }}>Haga su pedido </h1>
             <p style={{ color: 'var(--gray)', fontSize: '.9rem' }}>Alitas frescas y crujientes directas a tu mesa.</p>
           </div>
 
@@ -236,7 +242,7 @@ export default function Order() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     {c.estado === 'agotado'
                       ? <span style={{ background: 'rgba(127,29,29,.5)', color: '#fca5a5', fontSize: '.7rem', fontWeight: 700, letterSpacing: 1, padding: '.18rem .55rem', borderRadius: 6 }}>🚫 Agotado</span>
-                      : <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); selectCombo(c) }}>+ Select Options</button>
+                      : <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); selectCombo(c) }}>+ Seleccionar </button>
                     }
                     {selCombo?.id === c.id && <span style={{ background: 'var(--red)', color: '#fff', fontSize: '.7rem', fontWeight: 700, padding: '.18rem .55rem', borderRadius: 6 }}>✔ Selected</span>}
                   </div>

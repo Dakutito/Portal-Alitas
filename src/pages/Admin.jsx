@@ -461,7 +461,8 @@ function TabStats({ showToast, confirm }) {
     const pedidosActivos = allP.filter(x => !['completado', 'eliminado'].includes(x.estado))
     const alitasUsadas = allP.reduce((a, pd) => {
       const co = allC.find(c => c.id === pd.combo_id)
-      return a + (co ? co.alitas : 0)
+      const wingsInOrder = pd.adicional?.alitas || (co ? co.alitas : 0)
+      return a + wingsInOrder
     }, 0)
 
     const hoy = new Date().toDateString()
