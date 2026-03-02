@@ -19,10 +19,18 @@ export default function Navbar() {
     } catch (error) {
       console.error('Error signing out:', error)
     } finally {
+      // Limpieza manual de seguridad para evitar sesiones persistentes fantasma
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('supabase.auth.token') || key.includes('sb-')) {
+          localStorage.removeItem(key)
+        }
+      })
       logout()
       showToast('info', '👋', 'Sesión cerrada', '¡Hasta pronto!')
       navigate('/')
       setDrawerOpen(false)
+      // Forzamos un pequeño delay o recarga si el problema persiste, 
+      // pero por ahora esta limpieza debería ser suficiente.
     }
   }
 

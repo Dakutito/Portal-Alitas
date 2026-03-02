@@ -21,13 +21,36 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event, !!session)
+
+      if (event === 'SIGNED_OUT' || !session) {
+        logout()
+        return
+      }
+
       if (session?.user) {
         setUser(session.user)
-        const { data: prof } = await supabase
-          .from('profiles').select('*').eq('id', session.user.id).single()
-        setProfile(prof || null)
-      } else {
-        logout()
+        try {
+          const { data: prof, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+
+          if (!error && prof) {
+            setProfile(prof)
+          } else {
+            // Si no hay perfil, al menos tenemos el usuario de auth
+            setProfile({
+              id: session.user.id,
+              email: session.user.email,
+              nombre: session.user.user_metadata?.nombre || 'Usuario',
+              rol: 'user'
+            })
+          }
+        } catch (e) {
+          console.error('Error fetching profile:', e)
+        }
       }
     })
     return () => subscription.unsubscribe()
