@@ -18,7 +18,7 @@ function ProtectedRoute({ children, adminOnly }) {
 
 export default function App() {
   const { setUser, setProfile, logout } = useStore()
-  const [ready, setReady] = useState(false)
+
 
   useEffect(() => {
     // Carga sesión inicial rápidamente
@@ -28,7 +28,7 @@ export default function App() {
         setUser(session.user)
         setProfile(prof)
       }
-      setReady(true)
+
     })
 
     // Escucha cambios de auth
@@ -44,13 +44,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [setUser, setProfile, logout])
 
-  // Pequeño splash mientras carga sesión
-  if (!ready) return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem' }}>
-      <span style={{ fontSize: '3.5rem', animation: 'float 1.5s ease-in-out infinite' }}>🔥</span>
-      <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1.6rem', letterSpacing: 2, color: 'var(--gray)' }}>Portal de las Alitas</div>
-    </div>
-  )
+
 
   return (
     <>
