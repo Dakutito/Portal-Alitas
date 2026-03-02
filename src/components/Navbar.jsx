@@ -5,7 +5,8 @@ import { useStore } from '../store/useStore'
 import AuthModal from './AuthModal'
 
 export default function Navbar() {
-  const { user, profile, logout, showToast } = useStore()
+  const { user, profile, logout, showToast, ready } = useStore()
+  if (!ready) return null // Evita parpadeo de botones (Login/Cerrar Sesión) mientras cargamos
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [authTab, setAuthTab] = useState('login')

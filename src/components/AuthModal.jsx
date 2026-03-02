@@ -24,59 +24,75 @@ export default function AuthModal({ tab: initialTab, onClose }) {
   const doLogin = async () => {
     if (!email || !password) { setErr('Ingresa email y contraseña.'); return }
     if (isAdmin && adminKey && adminKey !== ADMIN_CLAVE) { setErr('Clave de admin incorrecta.'); return }
-    setErr(''); setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password
-    })
+    setErr('')
+    setLoading(true)
 
-    if (error) {
-      setErr('Email o contraseña incorrectos.')
-      setLoading(false); return
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      })
+
+      if (error) {
+        setErr('Email o contraseña incorrectos.')
+        setLoading(false)
+        return
+      }
+
+      // Si es exitoso, App.jsx se encargará de setear el perfil via onAuthStateChange
+      showToast('success', '🎉', '¡Bienvenido!', '')
+      onClose()
+
+      if (isAdmin) {
+        navigate('/admin')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setErr('Ocurrió un error inesperado al iniciar sesión.')
+    } finally {
+      // ESTO ES CRUCIAL: siempre liberar el botón
+      setLoading(false)
     }
-
-    // El perfil y user ya se setean en App.jsx via onAuthStateChange
-    // Solo necesitamos saber si es admin para redirigir
-    showToast('success', '🎉', '¡Bienvenido!', '')
-    onClose()
-
-    // Revisar rol para redirigir al admin
-    if (isAdmin) {
-      navigate('/admin')
-    }
-
-    setLoading(false)
   }
 
   const doRegister = async () => {
     if (!nombre.trim() || !email.trim() || !password) { setErr('Todos los campos son requeridos.'); return }
     if (password.length < 6) { setErr('Contraseña mínimo 6 caracteres.'); return }
-    setErr(''); setLoading(true)
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: { data: { nombre: nombre.trim() } }
-    })
+    setErr('')
+    setLoading(true)
 
-    if (error) {
-      setErr(error.message.includes('already') ? 'Este email ya está registrado.' : error.message)
-      setLoading(false); return
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: { data: { nombre: nombre.trim() } }
+      })
+
+      if (error) {
+        setErr(error.message.includes('already') ? 'Este email ya está registrado.' : error.message)
+        setLoading(false)
+        return
+      }
+
+      if (data.user) {
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          nombre: nombre.trim(),
+          email: email.trim().toLowerCase(),
+          rol: 'user'
+        }, { onConflict: 'id' })
+
+        showToast('success', '✅', '¡Cuenta creada!', `Bienvenido, ${nombre.trim()}`)
+        onClose()
+      }
+    } catch (error) {
+      console.error('Register error:', error)
+      setErr('Ocurrió un error al crear la cuenta.')
+    } finally {
+      setLoading(false)
     }
-
-    // Insertar perfil directamente (no depender solo del trigger)
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      nombre: nombre.trim(),
-      email: email.trim().toLowerCase(),
-      rol: 'user'
-    }, { onConflict: 'id' })
-
-    // onAuthStateChange en App.jsx tomará el control y seteará user+profile
-    showToast('success', '✅', '¡Cuenta creada!', `Bienvenido, ${nombre.trim()}`)
-    onClose()
-    setLoading(false)
   }
 
   const switchTab = (t) => {
