@@ -1132,9 +1132,7 @@ textarea {
 }
 
 @media(min-width:901px) {
-  .hamburger-btn {
-    display: none !important;
-  }
+  /* Hamburger is now always visible */
 }
 
 

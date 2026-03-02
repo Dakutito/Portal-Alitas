@@ -53,6 +53,7 @@ export default function Navbar() {
           {!isAdmin && <NavBtn onClick={() => user ? navigate('/order') : openAuth('login')} active={location.pathname === '/order'}>🍗 Menú</NavBtn>}
           {user && !isAdmin && <NavBtn onClick={() => navigate('/status')} active={location.pathname === '/status'}>📦 Mis Pedidos</NavBtn>}
           {isAdmin && <NavBtn onClick={() => navigate('/admin')} active={location.pathname === '/admin'}>👑 Admin</NavBtn>}
+          {user && <NavBtn onClick={handleLogout} style={{ color: 'var(--red)' }}>👋 Salir</NavBtn>}
         </div>
 
         {/* Right section */}
@@ -134,13 +135,14 @@ export default function Navbar() {
   )
 }
 
-function NavBtn({ children, onClick, active }) {
+function NavBtn({ children, onClick, active, style }) {
   return (
     <button onClick={onClick} style={{
       background: active ? 'rgba(255,255,255,.07)' : 'none', border: 'none',
       color: active ? 'var(--white)' : 'var(--gray)', fontSize: '.88rem', fontWeight: 500,
       padding: '.45rem .85rem', borderRadius: 8, cursor: 'pointer', transition: 'all .2s',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      ...style
     }}>{children}</button>
   )
 }
