@@ -130,6 +130,40 @@ export default function Order() {
       return
     }
 
+    // --- INVENTORY UPDATE ---
+    try {
+      // 1. Alitas
+      const alitasNeeded = selCombo.alitas || 0
+      if (alitasNeeded > 0) {
+        const { data: invAlitas } = await supabase.from('inventario').select('valor').eq('clave', 'alitas').single()
+        if (invAlitas) {
+          await supabase.from('inventario').update({ valor: Math.max(0, invAlitas.valor - alitasNeeded) }).eq('clave', 'alitas')
+        }
+      }
+
+      // 2. Arroz
+      for (const tId in arrozSnapshot) {
+        const qty = arrozSnapshot[tId]
+        const { data: invArroz } = await supabase.from('inventario').select('valor').eq('clave', 'arroz').single()
+        if (invArroz) {
+          await supabase.from('inventario').update({ valor: Math.max(0, invArroz.valor - qty) }).eq('clave', 'arroz')
+        }
+      }
+
+      // 3. Bebidas
+      for (const bId in bebCounts) {
+        const qty = bebCounts[bId]
+        if (qty > 0) {
+          const { data: invBeb } = await supabase.from('inventario').select('valor').eq('clave', 'beb_' + bId).single()
+          if (invBeb) {
+            await supabase.from('inventario').update({ valor: Math.max(0, invBeb.valor - qty) }).eq('clave', 'beb_' + bId)
+          }
+        }
+      }
+    } catch (invErr) {
+      console.error("Inventory update error:", invErr)
+    }
+
     // Insert salsas into NEW TABLE
     const salsaRows = Object.entries(salsas).filter(([, v]) => v > 0).map(([s, c]) => ({
       pedido_id: ped.id,
@@ -174,9 +208,25 @@ export default function Order() {
       selTipos.forEach(t => adicional.items.push({ desc: `${t.emoji || '🍚'} ${t.nombre} ×${eaQty[t.id]}`, subtotal: t.precio * eaQty[t.id] }))
       adicional.arroz = Number(adicional.arroz || 0) + tot
       await supabase.from('pedidos').update({ arroz: newArroz, adicional, total: Number(activo.total) + tot, modificado: true, ultima_mod: new Date().toISOString() }).eq('id', activo.id)
+
+      // Update inventory for arroz
+      const { data: invArroz } = await supabase.from('inventario').select('valor').eq('clave', 'arroz').single()
+      if (invArroz) {
+        const totalQty = selTipos.reduce((a, t) => a + eaQty[t.id], 0)
+        await supabase.from('inventario').update({ valor: Math.max(0, invArroz.valor - totalQty) }).eq('clave', 'arroz')
+      }
+
       showToast('success', '🍚', '¡Arroz agregado!', `Mesa ${eaMesa} · +$${tot.toFixed(2)}`)
     } else {
       await supabase.from('pedidos').insert({ usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot, tipo: 'servir', mesa: eaMesa, mensaje: 'Solo arroz', estado: 'pendiente', es_extra: true, tipo_extra: 'arroz', arroz: arrozExtra })
+
+      // Update inventory for arroz
+      const { data: invArroz } = await supabase.from('inventario').select('valor').eq('clave', 'arroz').single()
+      if (invArroz) {
+        const totalQty = selTipos.reduce((a, t) => a + eaQty[t.id], 0)
+        await supabase.from('inventario').update({ valor: Math.max(0, invArroz.valor - totalQty) }).eq('clave', 'arroz')
+      }
+
       showToast('success', '🍚', '¡Arroz pedido!', `Mesa ${eaMesa} · $${tot.toFixed(2)}`)
     }
     const reset = {}; tiposArroz.forEach(t => reset[t.id] = 0)
@@ -202,12 +252,29 @@ export default function Order() {
       await supabase.from('pedidos').update({ adicional, total: Number(activo.total) + tot, modificado: true, ultima_mod: new Date().toISOString() }).eq('id', activo.id)
       const rows = bebRows.map(r => ({ ...r, pedido_id: activo.id }))
       await supabase.from('pedido_extras').insert(rows)
+
+      // Update inventory for bebidas
+      for (const b of selBeb) {
+        const { data: invBeb } = await supabase.from('inventario').select('valor').eq('clave', 'beb_' + b.id).single()
+        if (invBeb) {
+          await supabase.from('inventario').update({ valor: Math.max(0, invBeb.valor - ebCounts[b.id]) }).eq('clave', 'beb_' + b.id)
+        }
+      }
+
       showToast('success', '🥤', '¡Bebidas agregadas!', `Mesa ${ebMesa} · +$${tot.toFixed(2)}`)
     } else {
       const { data: ped } = await supabase.from('pedidos').insert({ usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot, tipo: 'servir', mesa: ebMesa, mensaje: 'Solo bebidas', estado: 'pendiente', es_extra: true, tipo_extra: 'bebida' }).select().single()
       if (ped) {
         const rows = bebRows.map(r => ({ ...r, pedido_id: ped.id }))
         await supabase.from('pedido_extras').insert(rows)
+
+        // Update inventory for bebidas
+        for (const b of selBeb) {
+          const { data: invBeb } = await supabase.from('inventario').select('valor').eq('clave', 'beb_' + b.id).single()
+          if (invBeb) {
+            await supabase.from('inventario').update({ valor: Math.max(0, invBeb.valor - ebCounts[b.id]) }).eq('clave', 'beb_' + b.id)
+          }
+        }
       }
       showToast('success', '🥤', '¡Bebidas pedidas!', `Mesa ${ebMesa} · $${tot.toFixed(2)}`)
     }

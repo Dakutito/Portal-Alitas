@@ -123,24 +123,31 @@ function TabPedidos({ showToast, confirm, onBadge }) {
   const [tiposArroz, setTiposArroz] = useState([])
 
   const load = async () => {
-    const [p, c, u, a] = await Promise.all([
-      supabase.from('pedidos').select('*').not('estado', 'in', '(completado,eliminado)').order('created_at', { ascending: true }),
-      supabase.from('combos').select('*'),
-      supabase.from('profiles').select('*'),
-      supabase.from('tipos_arroz').select('*'),
-    ])
-    const allP = p.data || []
-    setPedidos(allP); setCombos(c.data || []); setUsers(u.data || []); setTiposArroz(a.data || [])
-    if (allP.length) {
-      const ids = allP.map(x => x.id)
-      const [s, e] = await Promise.all([supabase.from('pedido_salsas').select('*').in('pedido_id', ids), supabase.from('pedido_extras').select('*').in('pedido_id', ids)])
-      const sm = {}; (s.data || []).forEach(x => { if (!sm[x.pedido_id]) sm[x.pedido_id] = []; sm[x.pedido_id].push(x) })
-      const em = {}; (e.data || []).forEach(x => { if (!em[x.pedido_id]) em[x.pedido_id] = []; em[x.pedido_id].push(x) })
-      setSalsasMap(sm); setExtrasMap(em)
+    try {
+      const [p, c, u, a] = await Promise.all([
+        supabase.from('pedidos').select('id, created_at, usuario_id, combo_id, combo_precio, total, tipo, mesa, direccion, mensaje, estado, arroz, adicional, es_extra, tipo_extra').not('estado', 'in', '(completado,eliminado)').order('created_at', { ascending: true }),
+        supabase.from('combos').select('id, nombre, emoji, alitas'),
+        supabase.from('profiles').select('id, nombre, email'),
+        supabase.from('tipos_arroz').select('id, nombre, emoji'),
+      ])
+      const allP = p.data || []
+      setPedidos(allP); setCombos(c.data || []); setUsers(u.data || []); setTiposArroz(a.data || [])
+      if (allP.length) {
+        const ids = allP.map(x => x.id)
+        const [s, e] = await Promise.all([
+          supabase.from('pedido_salsas').select('pedido_id, tipo_salsa, cantidad').in('pedido_id', ids),
+          supabase.from('pedido_extras').select('pedido_id, nombre, cantidad, precio, tipo').in('pedido_id', ids)
+        ])
+        const sm = {}; (s.data || []).forEach(x => { if (!sm[x.pedido_id]) sm[x.pedido_id] = []; sm[x.pedido_id].push(x) })
+        const em = {}; (e.data || []).forEach(x => { if (!em[x.pedido_id]) em[x.pedido_id] = []; em[x.pedido_id].push(x) })
+        setSalsasMap(sm); setExtrasMap(em)
+      }
+    } catch (err) {
+      console.error("Admin: Error loading data:", err)
     }
   }
 
-  useEffect(() => { load(); const iv = setInterval(load, 3000); return () => clearInterval(iv) }, [])
+  useEffect(() => { load(); const iv = setInterval(load, 5000); return () => clearInterval(iv) }, [])
 
   const updateEstado = async (id, estado) => {
     await supabase.from('pedidos').update({ estado }).eq('id', id)

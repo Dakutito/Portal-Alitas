@@ -69,21 +69,22 @@ export default function Navbar() {
             }}>Iniciar Sesión</button>
           )}
           {user && !isAdmin && (
-            <button onClick={() => navigate('/order')} style={{
+            <button onClick={() => navigate('/order')} className="hide-mobile" style={{
               background: 'var(--red)', color: '#fff', border: 'none', padding: '.45rem 1.1rem',
               borderRadius: 8, fontWeight: 600, fontSize: '.88rem', cursor: 'pointer', whiteSpace: 'nowrap'
             }}>🛒 Pedir Ahora</button>
           )}
           {user && (
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--red),var(--orange))', border: '2px solid rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.92rem', fontWeight: 700, cursor: 'pointer', color: '#fff', fontFamily: "'Bebas Neue',cursive" }}>
+            <div className="hide-mobile" style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,var(--red),var(--orange))', border: '2px solid rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.92rem', fontWeight: 700, cursor: 'pointer', color: '#fff', fontFamily: "'Bebas Neue',cursive" }}>
               {profile?.nombre?.[0]?.toUpperCase() || '?'}
             </div>
           )}
           {/* Hamburger */}
           <button onClick={() => setDrawerOpen(true)} className="hide-desktop" style={{
             background: 'none', border: 'none', color: 'var(--white)', cursor: 'pointer',
-            padding: '.25rem', width: 38, height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
-            flexDirection: 'column', gap: 5, transition: 'background .2s'
+            padding: '.25rem', width: 38, height: 38, borderRadius: 8, display: 'flex',
+            flexDirection: 'column', gap: 5, transition: 'background .2s',
+            alignItems: 'center', justifyContent: 'center'
           }}>
             <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
             <span style={{ display: 'block', width: 22, height: 2, background: 'var(--white)', borderRadius: 2 }} />
