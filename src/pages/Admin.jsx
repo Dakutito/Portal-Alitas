@@ -125,13 +125,20 @@ function TabPedidos({ showToast, confirm, onBadge }) {
   const load = async () => {
     try {
       const [p, c, u, a] = await Promise.all([
-        supabase.from('pedidos').select('id, created_at, usuario_id, combo_id, combo_precio, total, tipo, mesa, direccion, mensaje, estado, arroz, adicional, es_extra, tipo_extra').not('estado', 'in', '(completado,eliminado)').order('created_at', { ascending: true }),
+        supabase.from('pedidos').select('id, created_at, usuario_id, combo_id, combo_precio, total, tipo, mesa, direccion, mensaje, estado, arroz, adicional, es_extra, tipo_extra').not('estado', 'in', '("completado","eliminado")').order('created_at', { ascending: true }),
         supabase.from('combos').select('id, nombre, emoji, alitas'),
         supabase.from('profiles').select('id, nombre, email'),
         supabase.from('tipos_arroz').select('id, nombre, emoji'),
       ])
+
+      if (p.error) throw p.error
+      if (c.error) throw c.error
+      if (u.error) throw u.error
+      if (a.error) throw a.error
+
       const allP = p.data || []
       setPedidos(allP); setCombos(c.data || []); setUsers(u.data || []); setTiposArroz(a.data || [])
+
       if (allP.length) {
         const ids = allP.map(x => x.id)
         const [s, e] = await Promise.all([
@@ -144,6 +151,7 @@ function TabPedidos({ showToast, confirm, onBadge }) {
       }
     } catch (err) {
       console.error("Admin: Error loading data:", err)
+      showToast('error', '⚠️', 'Error al cargar pedidos', err.message)
     }
   }
 
@@ -201,23 +209,44 @@ function TabPedidos({ showToast, confirm, onBadge }) {
 function TabUsuarios() {
   const [users, setUsers] = useState([])
   const [pedidos, setPedidos] = useState([])
-  useEffect(() => {
-    supabase.from('profiles').select('*').then(r => setUsers(r.data || []))
-    supabase.from('pedidos').select('id, usuario_id').then(r => setPedidos(r.data || []))
-  }, [])
+  const [loading, setLoading] = useState(true)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [u, p] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase.from('pedidos').select('id, usuario_id')
+      ])
+      setUsers(u.data || [])
+      setPedidos(p.data || [])
+    } catch (err) {
+      console.error("Error loading users:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
   return (
     <>
-      <h2>👥 Usuarios</h2>
-      <table className="a-table">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Pedidos</th></tr></thead>
-        <tbody>{users.map(u => (
-          <tr key={u.id}>
-            <td>{u.nombre}</td><td>{u.email}</td>
-            <td><span className={`sb-status ${u.rol === 'admin' ? 'st-listo' : 'st-pendiente'}`}>{u.rol}</span></td>
-            <td>{pedidos.filter(p => p.usuario_id === u.id).length}</td>
-          </tr>
-        ))}</tbody>
-      </table>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.4rem' }}>
+        <h2>👥 Usuarios</h2>
+        <button className="btn btn-ghost btn-sm" onClick={load}>🔄 Refresh</button>
+      </div>
+      {loading ? <p>Cargando usuarios...</p> : (
+        <table className="a-table">
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Pedidos</th></tr></thead>
+          <tbody>{users.map(u => (
+            <tr key={u.id}>
+              <td>{u.nombre}</td><td>{u.email}</td>
+              <td><span className={`sb-status ${u.rol === 'admin' ? 'st-listo' : 'st-pendiente'}`}>{u.rol}</span></td>
+              <td>{pedidos.filter(p => p.usuario_id === u.id).length}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
     </>
   )
 }
