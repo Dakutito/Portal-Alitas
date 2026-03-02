@@ -32,11 +32,21 @@ export default function AuthModal({ tab: initialTab, onClose }) {
         setErr('Email o contraseña incorrectos.')
         setLoading(false); return
       }
-      // El perfil se cargará automáticamente en App.jsx vía onAuthStateChange
+
+      // Obtener perfil inmediatamente para redirección rápida
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
+      setUser(data.user)
+      setProfile(prof)
+
       onClose()
       showToast('success', '🎉', 'Sesión iniciada', 'Bienvenido de nuevo')
+
+      if (prof?.rol === 'admin') {
+        navigate('/admin')
+      }
     } catch (e) {
       setErr('Error de conexión. Intenta de nuevo.')
+    } finally {
       setLoading(false)
     }
   }
@@ -59,14 +69,19 @@ export default function AuthModal({ tab: initialTab, onClose }) {
       if (error) { setErr(error.message); setLoading(false); return }
 
       // Upsert perfil manualmente para asegurar disponibilidad inmediata
-      await supabase.from('profiles').upsert({
+      const newProf = {
         id: data.user.id, nombre: form.nombre.trim(), email: form.email.trim(), rol: 'user'
-      }, { onConflict: 'id' })
+      }
+      await supabase.from('profiles').upsert(newProf, { onConflict: 'id' })
+
+      setUser(data.user)
+      setProfile(newProf)
 
       onClose()
       showToast('success', '✅', '¡Cuenta creada!', 'Bienvenido, ' + form.nombre.trim())
     } catch (e) {
       setErr('Error al crear cuenta. Intenta de nuevo.')
+    } finally {
       setLoading(false)
     }
   }
