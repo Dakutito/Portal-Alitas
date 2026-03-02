@@ -6,7 +6,7 @@ import AuthModal from './AuthModal'
 
 export default function Navbar() {
   const { user, profile, logout, showToast, ready } = useStore()
-  if (!ready) return null // Evita parpadeo de botones (Login/Cerrar Sesión) mientras cargamos
+  // Eliminamos el if (!ready) return null para evitar que desaparezca la barra si el inicio es lento
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [authTab, setAuthTab] = useState('login')
@@ -130,11 +130,11 @@ export default function Navbar() {
               fontWeight: 700, color: '#fff', fontFamily: "'Bebas Neue',cursive",
               fontSize: '1.1rem', flexShrink: 0
             }}>
-              {profile.nombre?.[0]?.toUpperCase()}
+              {profile?.nombre?.[0]?.toUpperCase() || '?'}
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '.93rem' }}>{profile.nombre}</div>
-              <div style={{ fontSize: '.75rem', color: 'var(--gray)' }}>{profile.email}</div>
+              <div style={{ fontWeight: 700, fontSize: '.95rem', lineHeight: 1.2 }}>{profile?.nombre || 'Usuario'}</div>
+              <div style={{ fontSize: '.75rem', color: 'var(--gray)' }}>{profile?.email}</div>
               {isAdmin && (
                 <span style={{
                   fontSize: '.65rem', background: 'rgba(232,34,10,.2)', color: 'var(--red)',

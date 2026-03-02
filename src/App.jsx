@@ -38,7 +38,10 @@ export default function App() {
       } else {
         logout()
       }
-      setReady(true) // ← siempre marcar listo después de verificar
+      setReady(true)
+    }).catch(err => {
+      console.error('Initial session check failed:', err)
+      setReady(true) // Al menos dejamos que la app se muestre
     })
 
     // 2. Escuchar cambios futuros (login, logout, token refresh)
