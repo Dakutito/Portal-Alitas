@@ -3,91 +3,89 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useStore } from '../store/useStore'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || 'admin@portalalitas.com'
-const ADMIN_KEY = import.meta.env.VITE_ADMIN_CLAVE || 'admin123may'
+const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL || 'admin@portalalitas.com').toLowerCase()
+const ADMIN_CLAVE = import.meta.env.VITE_ADMIN_CLAVE || 'admin123may'
 
 export default function AuthModal({ tab: initialTab, onClose }) {
   const [tab, setTab] = useState(initialTab || 'login')
-  const [form, setForm] = useState({ email: '', password: '', nombre: '', adminKey: '' })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [adminKey, setAdminKey] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
-  const { setUser, setProfile, showToast } = useStore()
+  const { showToast } = useStore()
   const navigate = useNavigate()
 
-  const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
-  const isAdminEmail = form.email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase()
+  // NO llamamos setUser/setProfile aquí — onAuthStateChange en App.jsx lo hace automáticamente
+
+  const isAdmin = email.trim().toLowerCase() === ADMIN_EMAIL
 
   const doLogin = async () => {
-    setErr('')
-    if (!form.email || !form.password) { setErr('Ingresa email y contraseña.'); return }
-    if (isAdminEmail && form.adminKey && form.adminKey !== ADMIN_KEY) {
-      setErr('Clave de admin incorrecta.'); return
+    if (!email || !password) { setErr('Ingresa email y contraseña.'); return }
+    if (isAdmin && adminKey && adminKey !== ADMIN_CLAVE) { setErr('Clave de admin incorrecta.'); return }
+    setErr(''); setLoading(true)
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password
+    })
+
+    if (error) {
+      setErr('Email o contraseña incorrectos.')
+      setLoading(false); return
     }
-    setLoading(true)
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: form.email.trim(), password: form.password
-      })
-      if (error) {
-        setErr('Email o contraseña incorrectos.')
-        setLoading(false); return
-      }
 
-      // Obtener perfil inmediatamente para redirección rápida
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-      setUser(data.user)
-      setProfile(prof)
+    // El perfil y user ya se setean en App.jsx via onAuthStateChange
+    // Solo necesitamos saber si es admin para redirigir
+    showToast('success', '🎉', '¡Bienvenido!', '')
+    onClose()
 
-      onClose()
-      showToast('success', '🎉', 'Sesión iniciada', 'Bienvenido de nuevo')
-
-      if (prof?.rol === 'admin') {
-        navigate('/admin')
-      }
-    } catch (e) {
-      setErr('Error de conexión. Intenta de nuevo.')
-    } finally {
-      setLoading(false)
+    // Revisar rol para redirigir al admin
+    if (isAdmin) {
+      navigate('/admin')
     }
+
+    setLoading(false)
   }
 
   const doRegister = async () => {
-    setErr('')
-    if (!form.nombre.trim() || !form.email.trim() || !form.password) {
-      setErr('Todos los campos son requeridos.'); return
-    }
-    if (form.password.length < 6) {
-      setErr('La contraseña debe tener al menos 6 caracteres.'); return
-    }
-    setLoading(true)
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: form.email.trim(),
-        password: form.password,
-        options: { data: { nombre: form.nombre.trim(), rol: 'user' } }
-      })
-      if (error) { setErr(error.message); setLoading(false); return }
+    if (!nombre.trim() || !email.trim() || !password) { setErr('Todos los campos son requeridos.'); return }
+    if (password.length < 6) { setErr('Contraseña mínimo 6 caracteres.'); return }
+    setErr(''); setLoading(true)
 
-      // Upsert perfil manualmente para asegurar disponibilidad inmediata
-      const newProf = {
-        id: data.user.id, nombre: form.nombre.trim(), email: form.email.trim(), rol: 'user'
-      }
-      await supabase.from('profiles').upsert(newProf, { onConflict: 'id' })
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: { data: { nombre: nombre.trim() } }
+    })
 
-      setUser(data.user)
-      setProfile(newProf)
-
-      onClose()
-      showToast('success', '✅', '¡Cuenta creada!', 'Bienvenido, ' + form.nombre.trim())
-    } catch (e) {
-      setErr('Error al crear cuenta. Intenta de nuevo.')
-    } finally {
-      setLoading(false)
+    if (error) {
+      setErr(error.message.includes('already') ? 'Este email ya está registrado.' : error.message)
+      setLoading(false); return
     }
+
+    // Insertar perfil directamente (no depender solo del trigger)
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      nombre: nombre.trim(),
+      email: email.trim().toLowerCase(),
+      rol: 'user'
+    }, { onConflict: 'id' })
+
+    // onAuthStateChange en App.jsx tomará el control y seteará user+profile
+    showToast('success', '✅', '¡Cuenta creada!', `Bienvenido, ${nombre.trim()}`)
+    onClose()
+    setLoading(false)
+  }
+
+  const switchTab = (t) => {
+    setTab(t); setErr('')
+    setEmail(''); setPassword(''); setNombre(''); setAdminKey('')
   }
 
   return (
-    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <button className="modal-close" onClick={onClose}>✕</button>
 
@@ -96,19 +94,22 @@ export default function AuthModal({ tab: initialTab, onClose }) {
             <h2 className="modal-title">🔥 Iniciar Sesión</h2>
             <div className="form-group">
               <label>Email</label>
-              <input type="email" value={form.email} onChange={f('email')} placeholder="tu@email.com"
-                onKeyDown={e => e.key === 'Enter' && doLogin()} autoFocus />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="tu@email.com" autoFocus
+                onKeyDown={e => e.key === 'Enter' && doLogin()} />
             </div>
             <div className="form-group">
               <label>Contraseña</label>
-              <input type="password" value={form.password} onChange={f('password')} placeholder="••••••••"
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
                 onKeyDown={e => e.key === 'Enter' && doLogin()} />
             </div>
-            {isAdminEmail && (
-              <div style={{ background: 'rgba(232,34,10,.06)', border: '1px solid rgba(232,34,10,.25)', borderRadius: 10, padding: '.9rem', marginTop: '.9rem' }}>
+            {isAdmin && (
+              <div style={{ background: 'rgba(232,34,10,.06)', border: '1px solid rgba(232,34,10,.25)', borderRadius: 10, padding: '.9rem', marginTop: '.5rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>🔒 Clave de Admin</label>
-                  <input type="password" value={form.adminKey} onChange={f('adminKey')} placeholder="Clave admin..."
+                  <input type="password" value={adminKey} onChange={e => setAdminKey(e.target.value)}
+                    placeholder="Clave admin..."
                     onKeyDown={e => e.key === 'Enter' && doLogin()} />
                 </div>
               </div>
@@ -116,32 +117,39 @@ export default function AuthModal({ tab: initialTab, onClose }) {
             {err && <div className="form-err">{err}</div>}
             <button className="btn btn-red" style={{ width: '100%', marginTop: '.9rem', justifyContent: 'center' }}
               onClick={doLogin} disabled={loading}>
-              {loading ? '⏳ Entrando...' : 'Entrar'}
+              {loading ? '⏳ Entrando...' : 'Entrar →'}
             </button>
-            <div className="auth-switch">¿No tienes cuenta? <a onClick={() => { setTab('register'); setErr('') }}>Regístrate aquí</a></div>
+            <div className="auth-switch">
+              ¿No tienes cuenta? <a onClick={() => switchTab('register')}>Regístrate aquí</a>
+            </div>
           </>
         ) : (
           <>
             <h2 className="modal-title">✨ Crear Cuenta</h2>
             <div className="form-group">
               <label>Nombre</label>
-              <input type="text" value={form.nombre} onChange={f('nombre')} placeholder="Tu nombre" autoFocus />
+              <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+                placeholder="Tu nombre" autoFocus />
             </div>
             <div className="form-group">
               <label>Email</label>
-              <input type="email" value={form.email} onChange={f('email')} placeholder="tu@email.com" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="tu@email.com" />
             </div>
             <div className="form-group">
               <label>Contraseña</label>
-              <input type="password" value={form.password} onChange={f('password')} placeholder="Mínimo 6 caracteres"
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
                 onKeyDown={e => e.key === 'Enter' && doRegister()} />
             </div>
             {err && <div className="form-err">{err}</div>}
             <button className="btn btn-red" style={{ width: '100%', marginTop: '.9rem', justifyContent: 'center' }}
               onClick={doRegister} disabled={loading}>
-              {loading ? '⏳ Creando...' : 'Crear Cuenta'}
+              {loading ? '⏳ Creando...' : 'Crear Cuenta →'}
             </button>
-            <div className="auth-switch">¿Ya tienes cuenta? <a onClick={() => { setTab('login'); setErr('') }}>Inicia sesión</a></div>
+            <div className="auth-switch">
+              ¿Ya tienes cuenta? <a onClick={() => switchTab('login')}>Inicia sesión</a>
+            </div>
           </>
         )}
       </div>
