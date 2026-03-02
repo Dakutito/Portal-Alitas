@@ -465,7 +465,12 @@ function TabStats({ showToast, confirm }) {
     }, 0)
 
     // Calcular ingresos de arroz (adicional.arroz es el total $ por pedido)
-    const arrozTotalRev = allP.reduce((a, pd) => a + Number(pd.adicional?.arroz || 0), 0)
+    const arrozTotalRev = allP.reduce((a, pd) => {
+      let r = Number(pd.adicional?.arroz || 0)
+      // Fallback para pedidos antiguos de "Solo Arroz" que no tenían el campo adicional.arroz
+      if (r === 0 && pd.tipo_extra === 'arroz') r = Number(pd.total || 0)
+      return a + r
+    }, 0)
 
     // Contar bebidas usadas individualmente
     const bebUsageMap = {}

@@ -103,10 +103,10 @@ export default function Order() {
       estado: 'pendiente',
       arroz: arrozSnapshot,
       adicional: {
-        arroz: 0,
-        bebidas: 0,
+        arroz: arrozCost,    // ← Precio real del arroz en el combo
+        bebidas: bebCost,    // ← Precio real de bebidas en el combo
         items: [],
-        alitas: selCombo.alitas || 0 // ← Snapshot para inventario
+        alitas: selCombo.alitas || 0
       }
     }).select().single()
     if (error) { showToast('error', '⚠️', 'Error', error.message); return }
@@ -147,7 +147,12 @@ export default function Order() {
       await supabase.from('pedidos').update({ arroz: newArroz, adicional, total: Number(activo.total) + tot, modificado: true, ultima_mod: new Date().toISOString() }).eq('id', activo.id)
       showToast('success', '🍚', '¡Arroz agregado!', `Mesa ${eaMesa} · +$${tot.toFixed(2)}`)
     } else {
-      await supabase.from('pedidos').insert({ usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot, tipo: 'servir', mesa: eaMesa, mensaje: 'Solo arroz', estado: 'pendiente', es_extra: true, tipo_extra: 'arroz', arroz: arrozExtra })
+      await supabase.from('pedidos').insert({
+        usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot,
+        tipo: 'servir', mesa: eaMesa, mensaje: 'Solo arroz', estado: 'pendiente',
+        es_extra: true, tipo_extra: 'arroz', arroz: arrozExtra,
+        adicional: { arroz: tot, bebidas: 0, items: [], alitas: 0 }
+      })
       showToast('success', '🍚', '¡Arroz pedido!', `Mesa ${eaMesa} · $${tot.toFixed(2)}`)
     }
     const reset = {}; tiposArroz.forEach(t => reset[t.id] = 0)
@@ -175,7 +180,12 @@ export default function Order() {
       await supabase.from('pedido_extras').insert(rows)
       showToast('success', '🥤', '¡Bebidas agregadas!', `Mesa ${ebMesa} · +$${tot.toFixed(2)}`)
     } else {
-      const { data: ped } = await supabase.from('pedidos').insert({ usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot, tipo: 'servir', mesa: ebMesa, mensaje: 'Solo bebidas', estado: 'pendiente', es_extra: true, tipo_extra: 'bebida' }).select().single()
+      const { data: ped } = await supabase.from('pedidos').insert({
+        usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot,
+        tipo: 'servir', mesa: ebMesa, mensaje: 'Solo bebidas', estado: 'pendiente',
+        es_extra: true, tipo_extra: 'bebida',
+        adicional: { arroz: 0, bebidas: tot, items: [], alitas: 0 }
+      }).select().single()
       if (ped) {
         const rows = bebRows.map(r => ({ ...r, pedido_id: ped.id }))
         await supabase.from('pedido_extras').insert(rows)
