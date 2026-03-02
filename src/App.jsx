@@ -21,24 +21,28 @@ export default function App() {
 
 
   useEffect(() => {
-    // Carga sesión inicial rápidamente
+    // Sincroniza sesión inicial
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         setUser(session.user)
         setProfile(prof)
+      } else {
+        // Si no hay sesión real pero hay datos persistidos, limpiar
+        if (useStore.getState().user) logout()
       }
-
     })
 
     // Escucha cambios de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
         const { data: prof } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         setUser(session.user)
         setProfile(prof)
       }
-      if (event === 'SIGNED_OUT') logout()
+      if (event === 'SIGNED_OUT') {
+        logout()
+      }
     })
 
     return () => subscription.unsubscribe()

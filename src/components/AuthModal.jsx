@@ -32,17 +32,13 @@ export default function AuthModal({ tab: initialTab, onClose }) {
         setErr('Email o contraseña incorrectos.')
         setLoading(false); return
       }
-      // Obtener perfil inmediatamente
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-      setUser(data.user)
-      setProfile(prof)
-      showToast('success', '🎉', '¡Bienvenido!', prof?.nombre || '')
+      // El perfil se cargará automáticamente en App.jsx vía onAuthStateChange
       onClose()
-      if (prof?.rol === 'admin') navigate('/admin')
+      showToast('success', '🎉', 'Sesión iniciada', 'Bienvenido de nuevo')
     } catch (e) {
       setErr('Error de conexión. Intenta de nuevo.')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const doRegister = async () => {
@@ -61,30 +57,18 @@ export default function AuthModal({ tab: initialTab, onClose }) {
         options: { data: { nombre: form.nombre.trim(), rol: 'user' } }
       })
       if (error) { setErr(error.message); setLoading(false); return }
-      if (data.user?.identities?.length === 0) {
-        setErr('Este email ya está registrado. Inicia sesión.'); setLoading(false); return
-      }
-      // Esperar trigger de DB y obtener perfil
-      await new Promise(r => setTimeout(r, 1000))
-      let prof = null
-      const { data: profData } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-      if (profData) {
-        prof = profData
-      } else {
-        // Crear perfil manualmente si el trigger tardó
-        const { data: newProf } = await supabase.from('profiles').upsert({
-          id: data.user.id, nombre: form.nombre.trim(), email: form.email.trim(), rol: 'user'
-        }, { onConflict: 'id' }).select().single()
-        prof = newProf
-      }
-      setUser(data.user)
-      setProfile(prof || { id: data.user.id, nombre: form.nombre.trim(), email: form.email.trim(), rol: 'user' })
-      showToast('success', '✅', '¡Cuenta creada!', 'Bienvenido, ' + form.nombre.trim())
+
+      // Upsert perfil manualmente para asegurar disponibilidad inmediata
+      await supabase.from('profiles').upsert({
+        id: data.user.id, nombre: form.nombre.trim(), email: form.email.trim(), rol: 'user'
+      }, { onConflict: 'id' })
+
       onClose()
+      showToast('success', '✅', '¡Cuenta creada!', 'Bienvenido, ' + form.nombre.trim())
     } catch (e) {
       setErr('Error al crear cuenta. Intenta de nuevo.')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
