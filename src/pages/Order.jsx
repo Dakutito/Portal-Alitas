@@ -116,7 +116,6 @@ export default function Order() {
       tipo: tipoServicio,
       mesa: tipoServicio !== 'domicilio' ? mesa : '',
       direccion: tipoServicio === 'domicilio' ? direccion : '',
-      mensaje,
       estado: 'pendiente',
       arroz: arrozSnapshot,
       mensaje: selCombo.isOffer ? `[OFERTA: ${selCombo.titulo}] ${mensaje}` : mensaje
