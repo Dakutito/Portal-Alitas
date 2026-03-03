@@ -90,14 +90,21 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
         </div>
       )}
 
-      {pedido.tipo === 'domicilio' && pedido.direccion && (
+      {pedido.tipo === 'domicilio' && (pedido.direccion || pedido.telefono) && (
         <div style={{ marginTop: '1rem', padding: '.8rem', background: 'rgba(96,165,250,.1)', border: '1px solid rgba(96,165,250,.2)', borderRadius: 10 }}>
           <div style={{ fontSize: '.7rem', fontWeight: 800, color: 'var(--blue)', textTransform: 'uppercase', marginBottom: '.3rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-            <span>📍</span> DIRECCIÓN DE ENTREGA
+            <span>📍</span> DIRECCIÓN / CONTACTO
           </div>
-          <div style={{ fontSize: '.9rem', color: 'var(--white)', fontWeight: 500, lineHeight: 1.4 }}>
-            {pedido.direccion}
-          </div>
+          {pedido.direccion && (
+            <div style={{ fontSize: '.9rem', color: 'var(--white)', fontWeight: 500, lineHeight: 1.4, marginBottom: pedido.telefono ? '.4rem' : 0 }}>
+              {pedido.direccion}
+            </div>
+          )}
+          {pedido.telefono && (
+            <div style={{ fontSize: '.9rem', color: 'var(--yellow)', fontWeight: 600 }}>
+              📞 Tel: {pedido.telefono}
+            </div>
+          )}
         </div>
       )}
 

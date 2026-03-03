@@ -22,6 +22,21 @@ export default function Admin() {
   const [pedidosActivos, setPedidosActivos] = useState(0)
   const lastCount = useRef(0)
   const [confirm, setConfirm] = useState(null)
+  const [storeStatus, setStoreStatus] = useState(true)
+
+  const loadStoreSettings = useCallback(async () => {
+    const { data } = await supabase.from('store_settings').select('is_open').eq('id', 1).single()
+    if (data) setStoreStatus(data.is_open)
+  }, [])
+
+  const toggleStoreStatus = async () => {
+    const newVal = !storeStatus
+    const { error } = await supabase.from('store_settings').update({ is_open: newVal }).eq('id', 1)
+    if (!error) {
+      setStoreStatus(newVal)
+      showToast('success', newVal ? '🔓' : '🔒', `Local ${newVal ? 'Abierto' : 'Cerrado'}`, '')
+    }
+  }
 
   const loadBadge = useCallback(async () => {
     const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true })
@@ -38,6 +53,7 @@ export default function Admin() {
   useEffect(() => {
     if (!user || profile?.rol !== 'admin') { navigate('/'); return }
     loadBadge()
+    loadStoreSettings()
     // Suscripción realtime para nuevos pedidos
     const ch = supabase.channel('admin-badge')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, () => {
@@ -74,6 +90,19 @@ export default function Admin() {
                 {t.id === 'pedidos' && pedidosActivos > 0 && <span className="admin-badge">{pedidosActivos}</span>}
               </button>
             ))}
+          </div>
+          <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.7rem' }}>Estado del Local</div>
+            <button
+              onClick={toggleStoreStatus}
+              className={`btn ${storeStatus ? 'btn-success' : 'btn-danger'}`}
+              style={{ width: '100%', justifyContent: 'center', gap: '.5rem', padding: '.6rem' }}
+            >
+              {storeStatus ? '🟢 Abierto' : '🔴 Cerrado'}
+            </button>
+            <div style={{ fontSize: '.65rem', color: 'var(--gray)', marginTop: '.4rem', textAlign: 'center' }}>
+              Haz clic para cambiar
+            </div>
           </div>
         </div>
         <div className="admin-content">
@@ -472,11 +501,15 @@ function TabStats({ showToast, confirm }) {
       return a + r
     }, 0)
 
-    // Contar bebidas usadas individualmente
+    // Contar bebidas y papas usadas individualmente
     const bebUsageMap = {}
+    let papasTotalQty = 0
     allPE.forEach(e => {
       if (e.tipo === 'normal' || e.tipo === 'alcohol') {
         bebUsageMap[e.nombre] = (bebUsageMap[e.nombre] || 0) + e.cantidad
+      }
+      if (e.nombre === 'Porción de Papas') {
+        papasTotalQty += e.cantidad
       }
     })
 
@@ -485,6 +518,7 @@ function TabStats({ showToast, confirm }) {
     const totalRev = allP.reduce((a, pd) => a + Number(pd.total || 0), 0)
     const bebNormal = allPE.filter(e => { const bv = allB.find(x => x.nombre === e.nombre); return bv?.tipo === 'normal' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
     const bebAlcohol = allPE.filter(e => { const bv = allB.find(x => x.nombre === e.nombre); return bv?.tipo === 'alcohol' }).reduce((a, e) => a + e.precio * e.cantidad, 0)
+    const papasTotalRev = allPE.filter(e => e.nombre === 'Porción de Papas').reduce((a, e) => a + e.precio * e.cantidad, 0)
 
     setStats({
       hoyP: hoyP.length,
@@ -497,6 +531,8 @@ function TabStats({ showToast, confirm }) {
       bebNormal,
       bebAlcohol,
       arrozTotalRev,
+      papasTotalQty,
+      papasTotalRev,
       bebUsageMap
     })
   }
@@ -639,6 +675,7 @@ function TabStats({ showToast, confirm }) {
         <div className="totales-card"><h4>🐔 Alitas Vendidas</h4><div className="tot-val">{stats.alitasUsadas}</div></div>
         <div className="totales-card"><h4>🍚 Arroz Total</h4><div className="tot-val">${stats.arrozTotalRev.toFixed(2)}</div></div>
         <div className="totales-card"><h4>🥤 Bebidas S/Alcohol</h4><div className="tot-val">${stats.bebNormal.toFixed(2)}</div></div>
+        <div className="totales-card"><h4>🍟 Porción de Papas</h4><div className="tot-val">${stats.papasTotalRev.toFixed(2)}</div></div>
         <div className="totales-card"><h4>🍺 Alcohólicas</h4><div className="tot-val">${stats.bebAlcohol.toFixed(2)}</div></div>
       </div>
     </>

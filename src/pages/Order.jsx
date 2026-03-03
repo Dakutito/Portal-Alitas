@@ -22,6 +22,7 @@ export default function Order() {
   const [mesa, setMesa] = useState('')
   const [direccion, setDireccion] = useState('')
   const [mensaje, setMensaje] = useState('')
+  const [telefono, setTelefono] = useState('')
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
 
   // Extra orders
@@ -29,6 +30,8 @@ export default function Order() {
   const [ebCounts, setEbCounts] = useState({})
   const [eaMesa, setEaMesa] = useState('')
   const [ebMesa, setEbMesa] = useState('')
+  const [papasQty, setPapasQty] = useState(0)
+  const [epMesa, setEpMesa] = useState('')
 
   // Modals
   const [ccCombo, setCcCombo] = useState(null) // confirm combo modal
@@ -66,7 +69,8 @@ export default function Order() {
   const pct = maxAlitas > 0 ? Math.min(totalSalsas / maxAlitas * 100, 100) : 0
   const arrozCost = tiposArroz.reduce((acc, t) => acc + (t.precio * (arrozQty[t.id] || 0)), 0)
   const bebCost = bebidas.reduce((acc, b) => acc + (b.precio * (bebCounts[b.id] || 0)), 0)
-  const total = (selCombo?.precio || 0) + arrozCost + bebCost
+  const papasCost = papasQty * 1.00
+  const total = (selCombo?.precio || 0) + arrozCost + bebCost + papasCost
 
   const canOrder = selCombo && totalSalsas === maxAlitas
 
@@ -100,11 +104,13 @@ export default function Order() {
       mesa: tipoServicio !== 'domicilio' ? mesa : '',
       direccion: tipoServicio === 'domicilio' ? direccion : '',
       mensaje: finalMensaje,
+      telefono: tipoServicio === 'domicilio' ? telefono : null,
       estado: 'pendiente',
       arroz: arrozSnapshot,
       adicional: {
         arroz: arrozCost,    // ← Precio real del arroz en el combo
         bebidas: bebCost,    // ← Precio real de bebidas en el combo
+        papas: papasCost,
         items: [],
         alitas: selCombo.alitas || 0
       }
@@ -121,6 +127,11 @@ export default function Order() {
       return b ? { pedido_id: ped.id, nombre: b.nombre, cantidad: qty, precio: b.precio, tipo: b.tipo } : null
     }).filter(Boolean)
     if (bebRows.length) await supabase.from('pedido_extras').insert(bebRows)
+
+    // Insert papas extras
+    if (papasQty > 0) {
+      await supabase.from('pedido_extras').insert({ pedido_id: ped.id, nombre: 'Porción de Papas', cantidad: papasQty, precio: 1.00, tipo: 'extra' })
+    }
 
     setSuccessDom(tipoServicio === 'domicilio')
     setSuccess(true)
@@ -194,6 +205,37 @@ export default function Order() {
     }
     const reset = {}; bebidas.forEach(b => reset[b.id] = 0)
     setEbCounts(reset); setEbMesa('')
+  }
+
+  const pedirExtraPapas = async () => {
+    if (!epMesa) { showToast('error', '⚠️', 'Error', 'Ingresa el número de mesa.'); return }
+    if (papasQty <= 0) { showToast('error', '⚠️', 'Error', 'Selecciona al menos una porción.'); return }
+    const tot = papasQty * 1.00
+
+    const { data: activos } = await supabase.from('pedidos').select('*')
+      .eq('usuario_id', user.id).eq('mesa', epMesa).in('estado', ['pendiente', 'preparacion', 'listo']).is('es_extra', false)
+
+    const activo = activos?.[0]
+    if (activo) {
+      const adicional = activo.adicional || { arroz: 0, bebidas: 0, items: [] }
+      adicional.items.push({ desc: `🍟 Porción de Papas ×${papasQty}`, subtotal: tot })
+      adicional.papas = Number(adicional.papas || 0) + tot
+      await supabase.from('pedidos').update({ adicional, total: Number(activo.total) + tot, modificado: true, ultima_mod: new Date().toISOString() }).eq('id', activo.id)
+      await supabase.from('pedido_extras').insert({ pedido_id: activo.id, nombre: 'Porción de Papas', cantidad: papasQty, precio: 1.00, tipo: 'extra' })
+      showToast('success', '🍟', '¡Papas agregadas!', `Mesa ${epMesa} · +$${tot.toFixed(2)}`)
+    } else {
+      const { data: ped } = await supabase.from('pedidos').insert({
+        usuario_id: user.id, combo_id: null, combo_precio: 0, total: tot,
+        tipo: 'servir', mesa: epMesa, mensaje: 'Solo papas', estado: 'pendiente',
+        es_extra: true, tipo_extra: 'papas',
+        adicional: { arroz: 0, bebidas: 0, papas: tot, items: [], alitas: 0 }
+      }).select().single()
+      if (ped) {
+        await supabase.from('pedido_extras').insert({ pedido_id: ped.id, nombre: 'Porción de Papas', cantidad: papasQty, precio: 1.00, tipo: 'extra' })
+      }
+      showToast('success', '🍟', '¡Papas pedidas!', `Mesa ${epMesa} · $${tot.toFixed(2)}`)
+    }
+    setPapasQty(0); setEpMesa('')
   }
 
   if (success) return <SuccessOverlay dom={successDom} onNew={() => { setSuccess(false); setSelCombo(null); const i = {}; SALSAS.forEach(s => i[s] = 0); setSalsas(i) }} onStatus={() => navigate('/status')} />
@@ -320,6 +362,29 @@ export default function Order() {
                 </div>
                 <button className="btn btn-blue btn-sm" style={{ width: '100%', justifyContent: 'center' }} onClick={pedirExtraBebida}>➤ Pedir Bebidas</button>
               </div>
+
+              {/* Solo Papas */}
+              <div style={{ background: 'linear-gradient(135deg,#1a1a1a,#1d1d1d)', border: '1.5px solid rgba(255,255,255,.1)', borderRadius: 'var(--radius)', padding: '1.2rem' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>🍟</div>
+                <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '.1rem' }}>Solo Papas</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginBottom: '.85rem' }}>Porción de papas crujientes</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, padding: '.42rem .7rem', marginBottom: '.35rem' }}>
+                  <div style={{ fontSize: '.84rem', fontWeight: 500 }}>🍟 Papas <span style={{ color: 'var(--yellow)', fontSize: '.72rem' }}>$1.00</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                    <QtyBtn onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty === 0}>−</QtyBtn>
+                    <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1rem', minWidth: 18, textAlign: 'center', color: papasQty > 0 ? 'var(--yellow)' : 'inherit' }}>{papasQty}</span>
+                    <QtyBtn onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
+                  </div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 8, padding: '.38rem .7rem', fontSize: '.82rem', fontWeight: 700, color: 'var(--yellow)', textAlign: 'right', marginBottom: '.6rem' }}>
+                  Total: ${(papasQty * 1).toFixed(2)}
+                </div>
+                <div style={{ marginBottom: '.5rem' }}>
+                  <label style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--gray)', display: 'block', marginBottom: '.3rem' }}>Mesa</label>
+                  <input type="number" value={epMesa} onChange={e => setEpMesa(e.target.value)} placeholder="Nº mesa" min="1" style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.5rem .7rem', borderRadius: 8, fontSize: '.85rem', outline: 'none' }} />
+                </div>
+                <button className="btn btn-red btn-sm" style={{ width: '100%', justifyContent: 'center', background: '#eab308', borderColor: '#eab308', color: '#000' }} onClick={pedirExtraPapas}>➤ Pedir Papas</button>
+              </div>
             </div>
           </div>
         </div>
@@ -427,6 +492,26 @@ export default function Order() {
           </div>
           <div style={{ height: 1, background: 'var(--border)', flexShrink: 0 }} />
 
+          {/* Papas */}
+          <div>
+            <div style={{ fontSize: '.72rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--gray)', marginBottom: '.55rem' }}>Papas <span style={{ fontSize: '.65rem', color: 'var(--gray)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: '.3rem', background: 'rgba(255,255,255,.07)', padding: '.08rem .38rem', borderRadius: 5 }}>Opcional</span></div>
+            <div onClick={() => setPapasQty(p => p > 0 ? 0 : 1)}
+              style={{ background: papasQty > 0 ? 'rgba(232,34,10,.08)' : 'var(--bg4)', border: `1.5px solid ${papasQty > 0 ? 'var(--red)' : 'var(--border)'}`, borderRadius: 9, padding: '.48rem .72rem', display: 'flex', alignItems: 'center', gap: '.55rem', cursor: 'pointer', transition: 'all .2s' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '.45rem' }}>
+                <span>🍟</span><span style={{ fontSize: '.84rem', fontWeight: 500 }}>Porción de Papas</span>
+                <span style={{ fontSize: '.7rem', color: 'var(--yellow)', fontWeight: 600, marginLeft: 'auto' }}>$1.00</span>
+              </div>
+              {papasQty > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }} onClick={e => e.stopPropagation()}>
+                  <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 1}>−</QtyBtn>
+                  <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center' }}>{papasQty}</span>
+                  <QtyBtn small onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ height: 1, background: 'var(--border)', flexShrink: 0 }} />
+
           {/* Mesa / Dirección */}
           {tipoServicio !== 'domicilio' ? (
             <div>
@@ -436,7 +521,10 @@ export default function Order() {
           ) : (
             <div>
               <label style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--gray)', display: 'block', marginBottom: '.35rem' }}>📍 Dirección de Entrega</label>
-              <textarea value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Calle, número, referencia..." rows={2} style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.52rem .75rem', borderRadius: 9, fontSize: '.85rem', outline: 'none', resize: 'vertical', minHeight: 50 }} />
+              <textarea value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Calle, número, referencia..." rows={2} style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.52rem .75rem', borderRadius: 9, fontSize: '.85rem', outline: 'none', resize: 'vertical', minHeight: 50, marginBottom: '.7rem' }} />
+
+              <label style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--gray)', display: 'block', marginBottom: '.35rem' }}>📞 Teléfono (Opcional)</label>
+              <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Ej. 0987654321" style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.52rem .75rem', borderRadius: 9, fontSize: '.85rem', outline: 'none' }} />
             </div>
           )}
 
@@ -448,7 +536,7 @@ export default function Order() {
 
           {/* Total */}
           <div style={{ background: 'var(--bg4)', borderRadius: 10, padding: '.85rem', flexShrink: 0 }}>
-            {[['Combo', (selCombo?.precio || 0).toFixed(2)], ['Arroz', arrozCost.toFixed(2)], ['Bebidas', bebCost.toFixed(2)]].map(([l, v]) => (
+            {[['Combo', (selCombo?.precio || 0).toFixed(2)], ['Arroz', arrozCost.toFixed(2)], ['Bebidas', bebCost.toFixed(2)], ['Papas', papasCost.toFixed(2)]].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.8rem', marginBottom: '.28rem', color: 'var(--gray)' }}><span>{l}</span><span>${v}</span></div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '.98rem', paddingTop: '.42rem', borderTop: '1px solid var(--border)', marginTop: '.42rem' }}>
@@ -489,7 +577,7 @@ export default function Order() {
 
       {/* CONFIRM ORDER */}
       {ocOpen && selCombo && (
-        <ConfirmOrderModal selCombo={selCombo} salsas={salsas} arrozQty={arrozQty} bebCounts={bebCounts} bebidas={bebidas} tiposArroz={tiposArroz} tipoServicio={tipoServicio} mesa={mesa} direccion={direccion} mensaje={mensaje} total={total} onClose={() => setOcOpen(false)} onConfirm={doEnviarPedido} />
+        <ConfirmOrderModal selCombo={selCombo} salsas={salsas} arrozQty={arrozQty} bebCounts={bebCounts} papasQty={papasQty} bebidas={bebidas} tiposArroz={tiposArroz} tipoServicio={tipoServicio} mesa={mesa} direccion={direccion} telefono={telefono} mensaje={mensaje} total={total} onClose={() => setOcOpen(false)} onConfirm={doEnviarPedido} />
       )}
     </div>
   )
@@ -525,11 +613,12 @@ function BebRow({ b, count, onChange }) {
   )
 }
 
-function ConfirmOrderModal({ selCombo, salsas, arrozQty, bebCounts, bebidas, tiposArroz, tipoServicio, mesa, direccion, mensaje, total, onClose, onConfirm }) {
+function ConfirmOrderModal({ selCombo, salsas, arrozQty, bebCounts, papasQty, bebidas, tiposArroz, tipoServicio, mesa, direccion, telefono, mensaje, total, onClose, onConfirm }) {
   const tipoLabel = { servir: '🍽 Servir en mesa', llevar: '🥡 Llevar', domicilio: '🛵 Domicilio' }
   const salsList = Object.entries(salsas).filter(([, v]) => v > 0).map(([s, c]) => `${s} ×${c}`).join(', ') || '—'
   const arrozStr = tiposArroz.filter(t => (arrozQty[t.id] || 0) > 0).map(t => `${t.emoji} ${t.nombre} ×${arrozQty[t.id]}`).join(' + ') || 'Sin arroz'
   const bebList = bebidas.filter(b => (bebCounts[b.id] || 0) > 0).map(b => `${b.emoji} ${b.nombre} ×${bebCounts[b.id]}`).join(', ') || '—'
+  const papasStr = papasQty > 0 ? `🍟 Papas ×${papasQty}` : '—'
   const Row = ({ l, v }) => <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '.28rem', marginBottom: '.28rem', fontSize: '.86rem' }}><span style={{ color: 'var(--gray)' }}>{l}</span><span style={{ textAlign: 'right', maxWidth: 200 }}>{v}</span></div>
   return (
     <div className="overlay">
@@ -542,8 +631,14 @@ function ConfirmOrderModal({ selCombo, salsas, arrozQty, bebCounts, bebidas, tip
           <Row l="🫙 Salsas" v={salsList} />
           <Row l="🍚 Arroz" v={arrozStr} />
           <Row l="🥤 Bebidas" v={bebList} />
+          <Row l="🍟 Papas" v={papasStr} />
           {tipoServicio !== 'domicilio' && <Row l="🪑 Mesa" v={`#${mesa}`} />}
-          {tipoServicio === 'domicilio' && <Row l="📍 Dirección" v={direccion} />}
+          {tipoServicio === 'domicilio' && (
+            <>
+              <Row l="📍 Dirección" v={direccion} />
+              {telefono && <Row l="📞 Teléfono" v={telefono} />}
+            </>
+          )}
           {mensaje && <Row l="💬 Nota" v={`"${mensaje}"`} />}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '.98rem', paddingTop: '.45rem', borderTop: '1px solid var(--border)', marginTop: '.3rem' }}>
             <span>Total a pagar</span><span style={{ color: 'var(--yellow)', fontFamily: "'Bebas Neue',cursive", fontSize: '1.35rem' }}>${total.toFixed(2)}</span>

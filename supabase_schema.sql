@@ -71,6 +71,7 @@ create table public.pedidos (
   es_extra boolean default false,
   tipo_extra text default null,
   modificado boolean default false,
+  telefono text default null,
   ultima_mod timestamptz default now(),
   created_at timestamptz default now()
 );
@@ -112,6 +113,15 @@ create table public.inventario (
   updated_at timestamptz default now()
 );
 
+create table public.store_settings (
+  id serial primary key,
+  is_open boolean not null default true,
+  updated_at timestamptz default now()
+);
+
+-- Insert initial setting
+insert into public.store_settings (id, is_open) values (1, true);
+
 -- 3. DESACTIVAR RLS (Para desarrollo sin errores de permisos)
 alter table public.profiles disable row level security;
 alter table public.combos disable row level security;
@@ -122,6 +132,7 @@ alter table public.pedido_salsas disable row level security;
 alter table public.pedido_extras disable row level security;
 alter table public.oferta disable row level security;
 alter table public.inventario disable row level security;
+alter table public.store_settings disable row level security;
 
 -- 4. REALTIME
 alter publication supabase_realtime add table public.pedidos;

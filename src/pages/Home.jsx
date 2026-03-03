@@ -19,6 +19,7 @@ export default function Home() {
   const [oferta, setOferta] = useState(null)
   const [timer, setTimer] = useState({ h: '00', m: '00', s: '00' })
   const [authOpen, setAuthOpen] = useState(false)
+  const [storeOpen, setStoreOpen] = useState(true)
   const { user } = useStore()
   const navigate = useNavigate()
 
@@ -27,6 +28,9 @@ export default function Home() {
     supabase.from('combos').select('*').then(({ data }) => setCombos(data || []))
     supabase.from('oferta').select('*').order('id', { ascending: false }).limit(1).then(({ data }) => {
       if (data && data[0] && data[0].activa) setOferta(data[0])
+    })
+    supabase.from('store_settings').select('is_open').eq('id', 1).single().then(({ data }) => {
+      if (data) setStoreOpen(data.is_open)
     })
   }, [])
 
@@ -57,6 +61,19 @@ export default function Home() {
         display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', padding: '4rem 5vw', gap: '2rem',
         position: 'relative', overflow: 'hidden'
       }} className="hero-grid">
+        <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', zIndex: 10, textAlign: 'right' }}>
+          <div style={{
+            background: 'rgba(14,14,14,.8)', backdropFilter: 'blur(10px)',
+            border: `1.5px solid ${storeOpen ? 'rgba(74,222,128,.3)' : 'rgba(239,68,68,.3)'}`,
+            borderRadius: 15, padding: '.6rem 1rem', display: 'flex', flexDirection: 'column', gap: '.1rem'
+          }}>
+            <div style={{ fontSize: '.65rem', color: 'var(--gray)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Modo:</div>
+            <div style={{ fontWeight: 700, fontSize: '.9rem', color: storeOpen ? 'var(--green)' : 'var(--red)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: storeOpen ? 'var(--green)' : 'var(--red)', boxShadow: `0 0 10px ${storeOpen ? 'var(--green)' : 'var(--red)'}` }} />
+              {storeOpen ? 'Abierto: estamos atendiendo.' : 'Cerrado: No estamos atendiendo.'}
+            </div>
+          </div>
+        </div>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 60% at 60% 50%,rgba(232,34,10,.12),transparent 70%)', pointerEvents: 'none' }} />
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', background: 'rgba(255,198,51,.12)', border: '1px solid rgba(255,198,51,.3)', color: 'var(--yellow)', fontSize: '.78rem', fontWeight: 600, letterSpacing: '1.5px', textTransform: 'uppercase', padding: '.3rem .85rem', borderRadius: 20, marginBottom: '1.5rem' }}>
@@ -67,6 +84,10 @@ export default function Home() {
           </h1>
           <p style={{ color: 'rgba(242,237,230,.6)', fontSize: '1.05rem', maxWidth: 420, marginBottom: '2rem', lineHeight: 1.7 }}>
             Elaboradas con ingredientes premium y nuestras salsas secretas. Cada mordida es una experiencia.
+            <br />
+            <span style={{ fontSize: '.85rem', color: 'var(--yellow)', display: 'block', marginTop: '.8rem', fontStyle: 'italic' }}>
+              Nota: los pedidos a domicilio sólo es para el cantón Isidro Ayora
+            </span>
           </p>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <button className="btn btn-red" onClick={handleOrder}>🍗 Pedir Ahora</button>
