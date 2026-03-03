@@ -23,10 +23,14 @@ export default function Admin() {
   const lastCount = useRef(0)
   const [confirm, setConfirm] = useState(null)
   const [storeStatus, setStoreStatus] = useState(true)
+  const [papasStatus, setPapasStatus] = useState(true)
 
   const loadStoreSettings = useCallback(async () => {
-    const { data } = await supabase.from('store_settings').select('is_open').eq('id', 1).single()
-    if (data) setStoreStatus(data.is_open)
+    const { data: storeData } = await supabase.from('store_settings').select('is_open').eq('id', 1).single()
+    if (storeData) setStoreStatus(storeData.is_open)
+
+    const { data: papasData } = await supabase.from('inventario').select('valor').eq('clave', 'papas_status').single()
+    if (papasData) setPapasStatus(papasData.valor === 1)
   }, [])
 
   const toggleStoreStatus = async () => {
@@ -35,6 +39,15 @@ export default function Admin() {
     if (!error) {
       setStoreStatus(newVal)
       showToast('success', newVal ? '🔓' : '🔒', `Local ${newVal ? 'Abierto' : 'Cerrado'}`, '')
+    }
+  }
+
+  const togglePapasStatus = async () => {
+    const newVal = !papasStatus
+    const { error } = await supabase.from('inventario').upsert({ clave: 'papas_status', valor: newVal ? 1 : 0 }, { onConflict: 'clave' })
+    if (!error) {
+      setPapasStatus(newVal)
+      showToast('success', newVal ? '🍟' : '🚫', `Papas ${newVal ? 'Disponibles' : 'Agotadas'}`, '')
     }
   }
 
@@ -91,16 +104,30 @@ export default function Admin() {
               </button>
             ))}
           </div>
-          <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.7rem' }}>Estado del Local</div>
-            <button
-              onClick={toggleStoreStatus}
-              className={`btn ${storeStatus ? 'btn-success' : 'btn-danger'}`}
-              style={{ width: '100%', justifyContent: 'center', gap: '.5rem', padding: '.6rem' }}
-            >
-              {storeStatus ? '🟢 Abierto' : '🔴 Cerrado'}
-            </button>
-            <div style={{ fontSize: '.65rem', color: 'var(--gray)', marginTop: '.4rem', textAlign: 'center' }}>
+          <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.7rem' }}>Estado del Local</div>
+              <button
+                onClick={toggleStoreStatus}
+                className={`btn ${storeStatus ? 'btn-success' : 'btn-danger'}`}
+                style={{ width: '100%', justifyContent: 'center', gap: '.5rem', padding: '.6rem' }}
+              >
+                {storeStatus ? '🟢 Abierto' : '🔴 Cerrado'}
+              </button>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '.7rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.7rem' }}>Disponibilidad Papas</div>
+              <button
+                onClick={togglePapasStatus}
+                className={`btn ${papasStatus ? 'btn-success' : 'btn-danger'}`}
+                style={{ width: '100%', justifyContent: 'center', gap: '.5rem', padding: '.6rem' }}
+              >
+                {papasStatus ? '🍟 Disponible' : '🚫 Agotado'}
+              </button>
+            </div>
+
+            <div style={{ fontSize: '.65rem', color: 'var(--gray)', textAlign: 'center' }}>
               Haz clic para cambiar
             </div>
           </div>
@@ -608,23 +635,45 @@ function TabStats({ showToast, confirm }) {
           )}
         </div>
 
-        {/* ARROZ */}
-        <div style={{ marginBottom: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.5rem' }}>🍚 Stock de Arroz</div>
-          <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              type="number" placeholder="Porciones" min="0"
-              value={invInputs['arroz'] ?? (inv['arroz'] !== undefined ? inv['arroz'] : '')}
-              onChange={e => setInvInputs(p => ({ ...p, arroz: e.target.value }))}
-              style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.45rem .7rem', borderRadius: 8, fontSize: '.88rem', outline: 'none', width: 130 }}
-            />
-            <button className="btn btn-success btn-sm" onClick={() => saveInv('arroz')}>💾 Guardar</button>
-          </div>
-          {inv['arroz'] !== undefined && (
-            <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: inv['arroz'] <= 0 ? '#f87171' : '#4ade80' }}>
-              {inv['arroz'] <= 0 ? '⚠️ ¡Sin stock de arroz!' : `✅ Stock: ${inv['arroz']} porciones`}
+        {/* ARROZ y PAPAS */}
+        <div style={{ marginBottom: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div>
+            <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.5rem' }}>🍚 Stock de Arroz</div>
+            <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="number" placeholder="Porciones" min="0"
+                value={invInputs['arroz'] ?? (inv['arroz'] !== undefined ? inv['arroz'] : '')}
+                onChange={e => setInvInputs(p => ({ ...p, arroz: e.target.value }))}
+                style={{ background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.45rem .7rem', borderRadius: 8, fontSize: '.88rem', outline: 'none', width: 130 }}
+              />
+              <button className="btn btn-success btn-sm" onClick={() => saveInv('arroz')}>💾 Guardar</button>
             </div>
-          )}
+            {inv['arroz'] !== undefined && (
+              <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: inv['arroz'] <= 0 ? '#f87171' : '#4ade80' }}>
+                {inv['arroz'] <= 0 ? '⚠️ ¡Sin stock de arroz!' : `✅ Stock: ${inv['arroz']} porciones`}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div style={{ fontSize: '.72rem', color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '.5rem' }}>🍟 Estado de Papas</div>
+            <button
+              onClick={() => {
+                const newVal = inv['papas_status'] === 1 ? 0 : 1
+                supabase.from('inventario').upsert({ clave: 'papas_status', valor: newVal }, { onConflict: 'clave' }).then(() => {
+                  load()
+                  showToast('success', newVal === 1 ? '🍟' : '🚫', `Papas ${newVal === 1 ? 'Disponibles' : 'Agotadas'}`, '')
+                })
+              }}
+              className={`btn ${inv['papas_status'] === 1 ? 'btn-success' : 'btn-danger'}`}
+              style={{ width: '100%', justifyContent: 'center', gap: '.5rem', padding: '.45rem' }}
+            >
+              {inv['papas_status'] === 1 ? '🍟 Disponible' : '🚫 Agotado'}
+            </button>
+            <div style={{ marginTop: '.5rem', fontSize: '.78rem', color: inv['papas_status'] !== 1 ? '#f87171' : '#4ade80' }}>
+              {inv['papas_status'] !== 1 ? '⚠️ Clientes no pueden pedir' : '✅ Clientes pueden pedir'}
+            </div>
+          </div>
         </div>
 
         {/* BEBIDAS */}

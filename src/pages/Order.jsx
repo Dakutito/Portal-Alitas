@@ -12,6 +12,7 @@ export default function Order() {
   const [bebidas, setBebidas] = useState([])
   const [tiposArroz, setTiposArroz] = useState([])
   const [oferta, setOferta] = useState(null)
+  const [papasDisponibles, setPapasDisponibles] = useState(true)
 
   // Sidebar state
   const [selCombo, setSelCombo] = useState(null)
@@ -48,7 +49,8 @@ export default function Order() {
       supabase.from('bebidas').select('*').eq('activa', true),
       supabase.from('tipos_arroz').select('*').eq('activo', true),
       supabase.from('oferta').select('*').order('id', { ascending: false }).limit(1),
-    ]).then(([c, b, a, o]) => {
+      supabase.from('inventario').select('valor').eq('clave', 'papas_status').single()
+    ]).then(([c, b, a, o, p]) => {
       setCombos(c.data || [])
       const bList = b.data || []
       setBebidas(bList)
@@ -60,6 +62,7 @@ export default function Order() {
       setArrozQty(aq); setEaQty({ ...aq })
       const of = o.data?.[0]
       if (of && of.activa) setOferta(of)
+      if (p.data) setPapasDisponibles(p.data.valor === 1)
     })
     const init = {}; SALSAS.forEach(s => init[s] = 0); setSalsas(init)
   }, [user])
@@ -364,26 +367,28 @@ export default function Order() {
               </div>
 
               {/* Solo Papas */}
-              <div style={{ background: 'linear-gradient(135deg,#1a1a1a,#1d1d1d)', border: '1.5px solid rgba(255,255,255,.1)', borderRadius: 'var(--radius)', padding: '1.2rem' }}>
+              <div style={{ background: 'linear-gradient(135deg,#1a1a1a,#1d1d1d)', border: '1.5px solid rgba(255,255,255,.1)', borderRadius: 'var(--radius)', padding: '1.2rem', opacity: papasDisponibles ? 1 : 0.5, cursor: papasDisponibles ? 'default' : 'not-allowed' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>🍟</div>
                 <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '.1rem' }}>Papas Extras</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginBottom: '.85rem' }}>Porción de papas crujientes extras</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, padding: '.42rem .7rem', marginBottom: '.35rem' }}>
+                <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginBottom: '.85rem' }}>{papasDisponibles ? 'Porción de papas crujientes extras' : 'Agotado momentáneamente'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, padding: '.42rem .7rem', marginBottom: '.35rem', opacity: papasDisponibles ? 1 : .6 }}>
                   <div style={{ fontSize: '.84rem', fontWeight: 500 }}>🍟 Papas <span style={{ color: 'var(--yellow)', fontSize: '.72rem' }}>$1.00</span></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-                    <QtyBtn onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty === 0}>−</QtyBtn>
+                    <QtyBtn onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty === 0 || !papasDisponibles}>−</QtyBtn>
                     <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '1rem', minWidth: 18, textAlign: 'center', color: papasQty > 0 ? 'var(--yellow)' : 'inherit' }}>{papasQty}</span>
-                    <QtyBtn onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
+                    <QtyBtn onClick={() => setPapasQty(p => p + 1)} disabled={!papasDisponibles}>+</QtyBtn>
                   </div>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 8, padding: '.38rem .7rem', fontSize: '.82rem', fontWeight: 700, color: 'var(--yellow)', textAlign: 'right', marginBottom: '.6rem' }}>
+                <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 8, padding: '.38rem .7rem', fontSize: '.82rem', fontWeight: 700, color: 'var(--yellow)', textAlign: 'right', marginBottom: '.6rem', opacity: papasDisponibles ? 1 : .6 }}>
                   Total: ${(papasQty * 1).toFixed(2)}
                 </div>
-                <div style={{ marginBottom: '.5rem' }}>
+                <div style={{ marginBottom: '.5rem', opacity: papasDisponibles ? 1 : .6 }}>
                   <label style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--gray)', display: 'block', marginBottom: '.3rem' }}>Mesa</label>
-                  <input type="number" value={epMesa} onChange={e => setEpMesa(e.target.value)} placeholder="Nº mesa" min="1" style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.5rem .7rem', borderRadius: 8, fontSize: '.85rem', outline: 'none' }} />
+                  <input type="number" value={epMesa} onChange={e => setEpMesa(e.target.value)} placeholder="Nº mesa" min="1" disabled={!papasDisponibles} style={{ width: '100%', background: 'var(--bg4)', border: '1px solid var(--border)', color: 'var(--white)', padding: '.5rem .7rem', borderRadius: 8, fontSize: '.85rem', outline: 'none' }} />
                 </div>
-                <button className="btn btn-red btn-sm" style={{ width: '100%', justifyContent: 'center', background: '#eab308', borderColor: '#eab308', color: '#000' }} onClick={pedirExtraPapas}>➤ Pedir Papas</button>
+                <button className="btn btn-red btn-sm" disabled={!papasDisponibles || papasQty <= 0} style={{ width: '100%', justifyContent: 'center', background: papasDisponibles ? '#eab308' : '#333', borderColor: papasDisponibles ? '#eab308' : '#444', color: papasDisponibles ? '#000' : '#888' }} onClick={pedirExtraPapas}>
+                  {papasDisponibles ? '➤ Pedir Papas' : '🚫 Agotado'}
+                </button>
               </div>
             </div>
           </div>
@@ -499,11 +504,12 @@ export default function Order() {
                 <span style={{ fontSize: '.7rem', color: 'var(--yellow)', fontWeight: 600, marginLeft: 'auto' }}>$1.00</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }}>
-                <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 0}>−</QtyBtn>
+                <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 0 || !papasDisponibles}>−</QtyBtn>
                 <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center', color: papasQty > 0 ? 'var(--white)' : 'var(--gray)' }}>{papasQty}</span>
-                <QtyBtn small onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
+                <QtyBtn small onClick={() => setPapasQty(p => p + 1)} disabled={!papasDisponibles}>+</QtyBtn>
               </div>
             </div>
+            {!papasDisponibles && <div style={{ fontSize: '.65rem', color: '#f87171', marginTop: '.3rem', fontWeight: 600 }}>🚫 Agotado momentáneamente</div>}
           </div>
           <div style={{ height: 1, background: 'var(--border)', flexShrink: 0 }} />
 
