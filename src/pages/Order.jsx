@@ -254,6 +254,7 @@ export default function Order() {
           <div style={{ marginBottom: '1.5rem' }}>
             <h1 style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '2.4rem', letterSpacing: 1, marginBottom: '.2rem' }}>Haga su pedido </h1>
             <p style={{ color: 'var(--gray)', fontSize: '.9rem' }}>Alitas frescas y crujientes directas a tu mesa.</p>
+            <p style={{ color: 'var(--gray)', fontSize: '.9rem' }}><strong>Nota:</strong> Realice su pedido en el local para apartar una mesa</p>
           </div>
 
           {oferta && (
