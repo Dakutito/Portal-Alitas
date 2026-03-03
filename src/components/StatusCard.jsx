@@ -14,11 +14,11 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
   const sauceItems = salsas.map(s => ({ name: s.tipo_salsa, qty: s.cantidad }))
   const drinkItems = extras.map(e => ({ name: e.nombre, qty: e.cantidad }))
   const adicional = pedido.adicional || {}
-  const adicionalTotal = Number(adicional.arroz || 0) + Number(adicional.bebidas || 0)
+  const adicionalTotal = Number(adicional.arroz || 0) + Number(adicional.bebidas || 0) + Number(adicional.papas || 0)
   const tipoLabel = TIPO_LABEL[pedido.tipo] || ''
   const esExtra = pedido.es_extra
   const extraTitle = esExtra
-    ? (pedido.tipo_extra === 'arroz' ? '🍚 Solo Arroz' : '🥤 Solo Bebidas')
+    ? (pedido.tipo_extra === 'arroz' ? '🍚 Solo Arroz' : pedido.tipo_extra === 'papas' ? '🍟 Solo Papas' : '🥤 Solo Bebidas')
     : `🍗 ${combo?.nombre || 'Combo'}`
   const mainTitle = (pedido.tipo !== 'domicilio' && pedido.mesa) ? `${extraTitle} — Mesa ${pedido.mesa}` : extraTitle
 
@@ -44,6 +44,12 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
         </div>
       ))}
 
+      {adicional.papas > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', fontSize: '1.15rem', fontWeight: 700, marginBottom: '.5rem', color: 'var(--white)' }}>
+          🍟 Porción de Papas <span style={{ color: 'var(--orange)', marginLeft: '.4rem' }}>×{Math.round(adicional.papas / 1)}</span>
+        </div>
+      )}
+
       {(sauceItems.length > 0 || drinkItems.length > 0) && (
         <div className="sc-items-container">
           {sauceItems.length > 0 && (
@@ -61,7 +67,7 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
           )}
           {drinkItems.length > 0 && (
             <>
-              <div className="sc-section-title"><span>🍹</span> BEBIDAS / DRINKS</div>
+              <div className="sc-section-title"><span>🍟</span> ADICIONALES / EXTRAS</div>
               <div className="sc-chip-grid">
                 {drinkItems.map((it, i) => (
                   <div key={i} className="sc-chip">
@@ -77,9 +83,24 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
 
       {adicionalTotal > 0 && (
         <div className="sc-additional-box">
-          <div className="sc-add-title"><span>➕</span> ADICIONAL (CARGO EXTRA)</div>
+          <div className="sc-add-title"><span>➕</span> DESGLOSE DE EXTRAS</div>
+          {Number(adicional.arroz || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(242,237,230,.75)', marginBottom: '.2rem', fontSize: '.8rem' }}>
+              <span>🍚 Total Arroz</span><span style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(adicional.arroz).toFixed(2)}</span>
+            </div>
+          )}
+          {Number(adicional.bebidas || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(242,237,230,.75)', marginBottom: '.2rem', fontSize: '.8rem' }}>
+              <span>🥤 Total Bebidas</span><span style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(adicional.bebidas).toFixed(2)}</span>
+            </div>
+          )}
+          {Number(adicional.papas || 0) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(242,237,230,.75)', marginBottom: '.2rem', fontSize: '.8rem' }}>
+              <span>🍟 Total Papas</span><span style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(adicional.papas).toFixed(2)}</span>
+            </div>
+          )}
           {(adicional.items || []).map((it, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(242,237,230,.75)', marginBottom: '.2rem', fontSize: '.8rem' }}>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(242,237,230,.75)', marginBottom: '.2rem', fontSize: '.8rem', borderTop: '1px solid rgba(255,255,255,.05)', paddingTop: '.2rem' }}>
               <span>{it.desc}</span><span style={{ color: 'var(--yellow)', fontWeight: 700 }}>${Number(it.subtotal).toFixed(2)}</span>
             </div>
           ))}
