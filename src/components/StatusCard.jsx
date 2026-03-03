@@ -46,7 +46,7 @@ export default function StatusCard({ pedido, salsas, extras, combos, tiposArroz,
 
       {adicional.papas > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', fontSize: '1.15rem', fontWeight: 700, marginBottom: '.5rem', color: 'var(--white)' }}>
-          🍟 Porción de Papas <span style={{ color: 'var(--orange)', marginLeft: '.4rem' }}>×{Math.round(adicional.papas / 1)}</span>
+          🍟 Porción de Papas extras <span style={{ color: 'var(--orange)', marginLeft: '.4rem' }}>×{Math.round(adicional.papas / 1)}</span>
         </div>
       )}
 

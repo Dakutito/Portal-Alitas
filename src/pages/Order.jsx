@@ -366,8 +366,8 @@ export default function Order() {
               {/* Solo Papas */}
               <div style={{ background: 'linear-gradient(135deg,#1a1a1a,#1d1d1d)', border: '1.5px solid rgba(255,255,255,.1)', borderRadius: 'var(--radius)', padding: '1.2rem' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '.5rem' }}>🍟</div>
-                <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '.1rem' }}>Solo Papas</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginBottom: '.85rem' }}>Porción de papas crujientes</div>
+                <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '.1rem' }}>Papas Extras</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--gray)', marginBottom: '.85rem' }}>Porción de papas crujientes extras</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg4)', border: '1px solid var(--border)', borderRadius: 8, padding: '.42rem .7rem', marginBottom: '.35rem' }}>
                   <div style={{ fontSize: '.84rem', fontWeight: 500 }}>🍟 Papas <span style={{ color: 'var(--yellow)', fontSize: '.72rem' }}>$1.00</span></div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
@@ -464,19 +464,17 @@ export default function Order() {
             {tiposArroz.length === 0
               ? <div style={{ color: 'var(--gray)', fontSize: '.8rem' }}>Sin tipos de arroz disponibles.</div>
               : tiposArroz.map(t => (
-                <div key={t.id} onClick={() => setArrozQty(p => ({ ...p, [t.id]: (p[t.id] || 0) > 0 ? 0 : 1 }))}
-                  style={{ background: (arrozQty[t.id] || 0) > 0 ? 'rgba(232,34,10,.08)' : 'var(--bg4)', border: `1.5px solid ${(arrozQty[t.id] || 0) > 0 ? 'var(--red)' : 'var(--border)'}`, borderRadius: 9, padding: '.48rem .72rem', display: 'flex', alignItems: 'center', gap: '.55rem', cursor: 'pointer', transition: 'all .2s', marginBottom: '.35rem' }}>
+                <div key={t.id}
+                  style={{ background: (arrozQty[t.id] || 0) > 0 ? 'rgba(232,34,10,.08)' : 'var(--bg4)', border: `1.5px solid ${(arrozQty[t.id] || 0) > 0 ? 'var(--red)' : 'var(--border)'}`, borderRadius: 9, padding: '.48rem .72rem', display: 'flex', alignItems: 'center', gap: '.55rem', transition: 'all .2s', marginBottom: '.35rem' }}>
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '.45rem' }}>
                     <span>{t.emoji}</span><span style={{ fontSize: '.84rem', fontWeight: 500 }}>{t.nombre}</span>
                     <span style={{ fontSize: '.7rem', color: 'var(--yellow)', fontWeight: 600, marginLeft: 'auto' }}>${Number(t.precio).toFixed(2)}</span>
                   </div>
-                  {(arrozQty[t.id] || 0) > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }} onClick={e => e.stopPropagation()}>
-                      <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: Math.max(0, (p[t.id] || 0) - 1) }))} disabled={(arrozQty[t.id] || 0) <= 0}>−</QtyBtn>
-                      <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center' }}>{arrozQty[t.id]}</span>
-                      <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: (p[t.id] || 0) + 1 }))}>+</QtyBtn>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }}>
+                    <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: Math.max(0, (p[t.id] || 0) - 1) }))} disabled={(arrozQty[t.id] || 0) <= 0}>−</QtyBtn>
+                    <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center', color: (arrozQty[t.id] || 0) > 0 ? 'var(--white)' : 'var(--gray)' }}>{arrozQty[t.id] || 0}</span>
+                    <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: (p[t.id] || 0) + 1 }))}>+</QtyBtn>
+                  </div>
                 </div>
               ))}
           </div>
@@ -495,19 +493,16 @@ export default function Order() {
           {/* Papas */}
           <div>
             <div style={{ fontSize: '.72rem', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--gray)', marginBottom: '.55rem' }}>Papas <span style={{ fontSize: '.65rem', color: 'var(--gray)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: '.3rem', background: 'rgba(255,255,255,.07)', padding: '.08rem .38rem', borderRadius: 5 }}>Opcional</span></div>
-            <div onClick={() => setPapasQty(p => p > 0 ? 0 : 1)}
-              style={{ background: papasQty > 0 ? 'rgba(232,34,10,.08)' : 'var(--bg4)', border: `1.5px solid ${papasQty > 0 ? 'var(--red)' : 'var(--border)'}`, borderRadius: 9, padding: '.48rem .72rem', display: 'flex', alignItems: 'center', gap: '.55rem', cursor: 'pointer', transition: 'all .2s' }}>
+            <div style={{ background: papasQty > 0 ? 'rgba(232,34,10,.08)' : 'var(--bg4)', border: `1.5px solid ${papasQty > 0 ? 'var(--red)' : 'var(--border)'}`, borderRadius: 9, padding: '.48rem .72rem', display: 'flex', alignItems: 'center', gap: '.55rem', transition: 'all .2s' }}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '.45rem' }}>
-                <span>🍟</span><span style={{ fontSize: '.84rem', fontWeight: 500 }}>Porción de Papas</span>
+                <span>🍟</span><span style={{ fontSize: '.84rem', fontWeight: 500 }}>Porción de Papas extras</span>
                 <span style={{ fontSize: '.7rem', color: 'var(--yellow)', fontWeight: 600, marginLeft: 'auto' }}>$1.00</span>
               </div>
-              {papasQty > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }} onClick={e => e.stopPropagation()}>
-                  <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 0}>−</QtyBtn>
-                  <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center' }}>{papasQty}</span>
-                  <QtyBtn small onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }}>
+                <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 0}>−</QtyBtn>
+                <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center', color: papasQty > 0 ? 'var(--white)' : 'var(--gray)' }}>{papasQty}</span>
+                <QtyBtn small onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
+              </div>
             </div>
           </div>
           <div style={{ height: 1, background: 'var(--border)', flexShrink: 0 }} />
