@@ -472,7 +472,7 @@ export default function Order() {
                   </div>
                   {(arrozQty[t.id] || 0) > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }} onClick={e => e.stopPropagation()}>
-                      <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: Math.max(0, (p[t.id] || 0) - 1) }))} disabled={(arrozQty[t.id] || 0) <= 1}>−</QtyBtn>
+                      <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: Math.max(0, (p[t.id] || 0) - 1) }))} disabled={(arrozQty[t.id] || 0) <= 0}>−</QtyBtn>
                       <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center' }}>{arrozQty[t.id]}</span>
                       <QtyBtn small onClick={() => setArrozQty(p => ({ ...p, [t.id]: (p[t.id] || 0) + 1 }))}>+</QtyBtn>
                     </div>
@@ -503,7 +503,7 @@ export default function Order() {
               </div>
               {papasQty > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.28rem' }} onClick={e => e.stopPropagation()}>
-                  <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 1}>−</QtyBtn>
+                  <QtyBtn small onClick={() => setPapasQty(p => Math.max(0, p - 1))} disabled={papasQty <= 0}>−</QtyBtn>
                   <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: '.9rem', minWidth: 13, textAlign: 'center' }}>{papasQty}</span>
                   <QtyBtn small onClick={() => setPapasQty(p => p + 1)}>+</QtyBtn>
                 </div>
